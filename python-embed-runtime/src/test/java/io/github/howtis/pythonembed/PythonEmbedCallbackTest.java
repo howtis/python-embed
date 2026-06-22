@@ -180,6 +180,15 @@ class PythonEmbedCallbackTest {
         assertEquals(42, result.asInt());
     }
 
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void push_unknownHandler_noEffect() {
+        // Push to an unregistered handler should be silently ignored
+        assertDoesNotThrow(() -> py.exec("_bridge.push('no_such_handler', 'value')"));
+        PythonValue result = py.eval("42");
+        assertEquals(42, result.asInt());
+    }
+
     // ---- CallbackHandler1/2/3 typed handler overloads ----
 
     @Test

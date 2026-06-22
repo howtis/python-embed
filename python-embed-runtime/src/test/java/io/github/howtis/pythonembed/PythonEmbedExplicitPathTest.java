@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
@@ -108,6 +110,19 @@ class PythonEmbedExplicitPathTest {
                                 .venvPath(nonexistent).build()));
         assertTrue(ex.getCause() instanceof IOException);
         assertTrue(ex.getCause().getMessage().contains("does not exist"));
+    }
+
+    @Test
+    void create_pathIsFile_throwsPythonExecutionException(@TempDir Path tempDir) throws Exception {
+        Path aFile = tempDir.resolve("not-a-directory.txt");
+        Files.createFile(aFile);
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .venvPath(aFile).build()));
+        assertTrue(ex.getCause() instanceof IOException);
+        assertTrue(ex.getCause().getMessage().contains("does not exist")
+                || ex.getCause().getMessage().contains("not a directory"));
     }
 
     // ------------------------------------------------------------------

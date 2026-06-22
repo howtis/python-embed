@@ -296,6 +296,60 @@ class VenvTaskTest {
         assertEquals("windows content", Files.readString(extracted));
     }
 
+    // ------------------------------------------------------------------
+    // findPythonInDir
+    // ------------------------------------------------------------------
+
+    @Test
+    void findPythonInDir_pythonExeAtRoot_returnsPath(@TempDir Path tempDir) throws Exception {
+        Path pythonExe = tempDir.resolve("python.exe");
+        Files.createFile(pythonExe);
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(pythonExe, result);
+    }
+
+    @Test
+    void findPythonInDir_pythonExeInScripts_returnsScriptsPath(@TempDir Path tempDir) throws Exception {
+        // When root has no python.exe, should find Scripts/python.exe
+        Path scriptsDir = tempDir.resolve("Scripts");
+        Files.createDirectories(scriptsDir);
+        Path pythonExe = scriptsDir.resolve("python.exe");
+        Files.createFile(pythonExe);
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(pythonExe, result);
+    }
+
+    @Test
+    void findPythonInDir_rootPreferredOverScripts(@TempDir Path tempDir) throws Exception {
+        // When both root and Scripts have python.exe, root takes precedence
+        Path rootExe = tempDir.resolve("python.exe");
+        Files.createFile(rootExe);
+        Path scriptsDir = tempDir.resolve("Scripts");
+        Files.createDirectories(scriptsDir);
+        Path scriptsExe = scriptsDir.resolve("python.exe");
+        Files.createFile(scriptsExe);
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(rootExe, result);
+    }
+
+    @Test
+    void findPythonInDir_noPythonExe_returnsNull(@TempDir Path tempDir) throws Exception {
+        Path result = task.findPythonInDir(tempDir);
+        assertNull(result);
+    }
+
+    @Test
+    void findPythonInDir_emptyScriptsDir_returnsNull(@TempDir Path tempDir) throws Exception {
+        // Scripts directory exists but has no python.exe, and no python.exe at root
+        Files.createDirectories(tempDir.resolve("Scripts"));
+
+        Path result = task.findPythonInDir(tempDir);
+        assertNull(result);
+    }
+
     // ---- tar.gz creation helpers ----
 
     private Path createTarGz(Path tempDir, String entryName, String content) throws IOException {
