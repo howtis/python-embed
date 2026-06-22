@@ -70,6 +70,8 @@ public class PythonEmbed implements AutoCloseable {
     private final List<PythonHandle> handles = new CopyOnWriteArrayList<>();
     private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
+    private final List<CloseHook> beforeCloseHooks;
+    private final List<CloseHook> afterCloseHooks;
     private Path venvPath;
     private Path bridgePath;
     private Thread processCleanupHook;
@@ -82,6 +84,8 @@ public class PythonEmbed implements AutoCloseable {
         this.writer = processManager.stdinWriter();
         this.env = options.env();
         this.explicitVenvPath = options.venvPath();
+        this.beforeCloseHooks = options.beforeCloseHooks();
+        this.afterCloseHooks = options.afterCloseHooks();
     }
 
     /**
@@ -753,6 +757,18 @@ public class PythonEmbed implements AutoCloseable {
     }
 
     private void closeInternal(long waitMs, long forceWaitMs) {
+        CloseReason reason = (processCleanupHook != null)
+                ? CloseReason.USER : CloseReason.SHUTDOWN_HOOK;
+
+        // Before-close hooks
+        for (CloseHook hook : beforeCloseHooks) {
+            try {
+                hook.onClose(this, reason);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Error in before-close hook", e);
+            }
+        }
+
         // Remove the JVM-shutdown cleanup hook (process is being
         // closed explicitly, so the hook should not fire later).
         if (processCleanupHook != null) {
@@ -786,6 +802,15 @@ public class PythonEmbed implements AutoCloseable {
             venvExtractor.close();
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error cleaning up venv", e);
+        }
+
+        // After-close hooks
+        for (CloseHook hook : afterCloseHooks) {
+            try {
+                hook.onClose(this, reason);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Error in after-close hook", e);
+            }
         }
     }
 
@@ -971,8 +996,10 @@ public class PythonEmbed implements AutoCloseable {
      *                         instead of throwing exceptions. Default is {@code true}
      *                         (backward-compatible; failures are logged but do not prevent startup).
      *                         Set to {@code false} to make warmup failures immediately visible
-     * @param venvPath         Explicit venv path, or null for auto-discovery / classpath extraction
-     * @param env              Environment variables to pass to the Python process (never null)
+     * @param venvPath          Explicit venv path, or null for auto-discovery / classpath extraction
+     * @param env               Environment variables to pass to the Python process (never null)
+     * @param beforeCloseHooks  Hooks called before the instance is closed (may be empty)
+     * @param afterCloseHooks   Hooks called after the instance is closed (may be empty)
      */
     public record Options(
             long timeoutMs,
@@ -982,11 +1009,14 @@ public class PythonEmbed implements AutoCloseable {
             List<String> warmupScripts,
             boolean lenientWarmup,
             Path venvPath,
-            Map<String, String> env
+            Map<String, String> env,
+            List<CloseHook> beforeCloseHooks,
+            List<CloseHook> afterCloseHooks
     ) {
         static Options defaults() {
             return new Options(30_000, 100_000, 30_000, null, Collections.emptyList(), true,
-                    null, Collections.emptyMap());
+                    null, Collections.emptyMap(),
+                    Collections.emptyList(), Collections.emptyList());
         }
 
         public static Builder builder() {
@@ -1002,6 +1032,8 @@ public class PythonEmbed implements AutoCloseable {
             private boolean lenientWarmup = true;
             private Path venvPath = null;
             private Map<String, String> env = Collections.emptyMap();
+            private final List<CloseHook> beforeCloseHooks = new ArrayList<>();
+            private final List<CloseHook> afterCloseHooks = new ArrayList<>();
 
             /** Set per-request timeout in milliseconds. */
             public Builder timeoutMs(long value) {
@@ -1060,11 +1092,30 @@ public class PythonEmbed implements AutoCloseable {
                 return this;
             }
 
+            /**
+             * Register a hook called before the instance is closed.
+             * Multiple hooks may be registered and will be called in order.
+             */
+            public Builder onBeforeClose(CloseHook hook) {
+                this.beforeCloseHooks.add(hook);
+                return this;
+            }
+
+            /**
+             * Register a hook called after the instance is closed.
+             * Multiple hooks may be registered and will be called in order.
+             */
+            public Builder onAfterClose(CloseHook hook) {
+                this.afterCloseHooks.add(hook);
+                return this;
+            }
+
             public Options build() {
                 return new Options(timeoutMs,
                         maxCodeLength, startupTimeoutMs, pythonExecutable,
                         List.copyOf(warmupScripts), lenientWarmup,
-                        venvPath, env);
+                        venvPath, env,
+                        List.copyOf(beforeCloseHooks), List.copyOf(afterCloseHooks));
             }
         }
     }

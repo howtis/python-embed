@@ -14,6 +14,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -77,6 +78,7 @@ public class PythonEmbedPool implements AutoCloseable {
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
     private final Map<String, Class<?>[]> callbackArgTypes = new ConcurrentHashMap<>();
     private final Map<String, Class<?>> pushValueTypes = new ConcurrentHashMap<>();
+    private final BiConsumer<PythonEmbed, CloseReason> onInstanceRemoved;
     private final Thread poolCleanupHook;
 
     /**
@@ -126,12 +128,24 @@ public class PythonEmbedPool implements AutoCloseable {
         private long idleTimeoutMs = 60_000;
         private long healthCheckIntervalMs = 30_000;
         private PythonEmbed.Options options = PythonEmbed.Options.defaults();
+        private BiConsumer<PythonEmbed, CloseReason> onInstanceRemoved = null;
 
         public Builder minPool(int v) { this.minPool = v; return this; }
         public Builder maxPool(int v) { this.maxPool = v; return this; }
         public Builder idleTimeoutMs(long v) { this.idleTimeoutMs = v; return this; }
         public Builder healthCheckIntervalMs(long v) { this.healthCheckIntervalMs = v; return this; }
         public Builder options(PythonEmbed.Options v) { this.options = v; return this; }
+
+        /**
+         * Register a callback invoked when a pool instance is removed
+         * (due to close, idle scale-down, or health check failure).
+         *
+         * @param callback receives the instance and the reason for removal
+         */
+        public Builder onInstanceRemoved(BiConsumer<PythonEmbed, CloseReason> callback) {
+            this.onInstanceRemoved = callback;
+            return this;
+        }
 
         /**
          * Builds a {@link PythonEmbedPool} and pre-warms it with
@@ -171,6 +185,7 @@ public class PythonEmbedPool implements AutoCloseable {
         this.idleTimeoutMs = b.idleTimeoutMs;
         this.healthCheckIntervalMs = b.healthCheckIntervalMs;
         this.options = b.options;
+        this.onInstanceRemoved = b.onInstanceRemoved;
 
         this.instances = new ConcurrentLinkedDeque<>();
         this.currentSize = new AtomicInteger(0);
@@ -764,7 +779,9 @@ public class PythonEmbedPool implements AutoCloseable {
         executor.shutdown();
 
         // Close all instances with the given timeout
+        CloseReason reason = CloseReason.USER;
         for (PooledInstance pi : instances) {
+            notifyInstanceRemoved(pi.embed, reason);
             try {
                 pi.embed.close(timeout, unit);
             } catch (Exception e) {
@@ -907,6 +924,16 @@ public class PythonEmbedPool implements AutoCloseable {
     /**
      * Periodically removes idle instances above minPool.
      */
+    private void notifyInstanceRemoved(PythonEmbed embed, CloseReason reason) {
+        if (onInstanceRemoved != null) {
+            try {
+                onInstanceRemoved.accept(embed, reason);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Error in onInstanceRemoved callback", e);
+            }
+        }
+    }
+
     private void cleanupIdleInstances() {
         long now = System.currentTimeMillis();
         Iterator<PooledInstance> it = instances.iterator();
@@ -918,6 +945,7 @@ public class PythonEmbedPool implements AutoCloseable {
                     if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                         if (currentSize.decrementAndGet() >= minPool) {
                             it.remove();
+                            notifyInstanceRemoved(pi.embed, CloseReason.POOL_CLEANUP);
                             try {
                                 pi.embed.close();
                             } catch (Exception e) {
@@ -978,6 +1006,7 @@ public class PythonEmbedPool implements AutoCloseable {
                         removed++;
                         currentSize.decrementAndGet();
                         instanceSemaphore.release();
+                        notifyInstanceRemoved(pi.embed, CloseReason.HEALTH_CHECK);
                         try {
                             pi.embed.close();
                         } catch (Exception e) {

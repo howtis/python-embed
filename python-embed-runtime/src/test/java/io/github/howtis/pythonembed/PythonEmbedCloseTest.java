@@ -6,9 +6,13 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -236,6 +240,124 @@ class PythonEmbedCloseTest {
         assertDoesNotThrow(() -> embed.close(60_000, TimeUnit.MILLISECONDS),
                 "close() with large timeout should not throw");
         assertNull(getField(embed, "processCleanupHook"));
+    }
+
+    // ------------------------------------------------------------------
+    // Close hooks
+    // ------------------------------------------------------------------
+
+    @Test
+    void closeHooks_receiveUserReason_whenShutdownHookPresent() {
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        AtomicReference<CloseReason> beforeReason = new AtomicReference<>();
+        AtomicReference<CloseReason> afterReason = new AtomicReference<>();
+        setField(embed, "beforeCloseHooks",
+                List.<CloseHook>of((e, r) -> beforeReason.set(r)));
+        setField(embed, "afterCloseHooks",
+                List.<CloseHook>of((e, r) -> afterReason.set(r)));
+
+        embed.close();
+
+        assertEquals(CloseReason.USER, beforeReason.get(),
+                "beforeClose hook should receive USER reason");
+        assertEquals(CloseReason.USER, afterReason.get(),
+                "afterClose hook should receive USER reason");
+    }
+
+    @Test
+    void closeHooks_receiveShutdownHookReason_whenHookAlreadyNull() {
+        setField(embed, "processCleanupHook", null);
+
+        AtomicReference<CloseReason> beforeReason = new AtomicReference<>();
+        setField(embed, "beforeCloseHooks",
+                List.<CloseHook>of((e, r) -> beforeReason.set(r)));
+        setField(embed, "afterCloseHooks",
+                List.<CloseHook>of((e, r) -> {}));
+
+        embed.close();
+
+        assertEquals(CloseReason.SHUTDOWN_HOOK, beforeReason.get(),
+                "beforeClose hook should receive SHUTDOWN_HOOK when processCleanupHook is null");
+    }
+
+    @Test
+    void closeHooks_multipleBeforeHooks_calledInOrder() {
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        List<String> order = new ArrayList<>();
+        setField(embed, "beforeCloseHooks", List.<CloseHook>of(
+                (e, r) -> order.add("first"),
+                (e, r) -> order.add("second"),
+                (e, r) -> order.add("third")));
+
+        embed.close();
+
+        assertEquals(List.of("first", "second", "third"), order);
+    }
+
+    @Test
+    void closeHooks_multipleAfterHooks_calledInOrder() {
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+        setField(embed, "beforeCloseHooks", Collections.emptyList());
+
+        List<String> order = new ArrayList<>();
+        setField(embed, "afterCloseHooks", List.<CloseHook>of(
+                (e, r) -> order.add("first"),
+                (e, r) -> order.add("second")));
+
+        embed.close();
+
+        assertEquals(List.of("first", "second"), order);
+    }
+
+    @Test
+    void closeHooks_hookException_doesNotPreventClose() {
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        AtomicBoolean afterCalled = new AtomicBoolean(false);
+        setField(embed, "beforeCloseHooks",
+                List.<CloseHook>of((e, r) -> { throw new RuntimeException("boom"); }));
+        setField(embed, "afterCloseHooks",
+                List.<CloseHook>of((e, r) -> afterCalled.set(true)));
+
+        assertDoesNotThrow(() -> embed.close(),
+                "close() should not throw when a before hook throws");
+        assertTrue(afterCalled.get(),
+                "afterClose hooks should still execute when before hook throws");
+    }
+
+    @Test
+    void closeHooks_emptyHooks_isSafe() {
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+        setField(embed, "beforeCloseHooks", Collections.emptyList());
+        setField(embed, "afterCloseHooks", Collections.emptyList());
+
+        assertDoesNotThrow(() -> embed.close(),
+                "close() with empty hook lists should not throw");
+    }
+
+    @Test
+    void closeHooks_builderRegistration_integration() {
+        PythonEmbed.Options opts = PythonEmbed.Options.builder()
+                .onBeforeClose((e, r) -> {})
+                .onAfterClose((e, r) -> {})
+                .build();
+
+        assertEquals(1, opts.beforeCloseHooks().size());
+        assertEquals(1, opts.afterCloseHooks().size());
+        assertTrue(opts.beforeCloseHooks().get(0) instanceof CloseHook);
+        assertTrue(opts.afterCloseHooks().get(0) instanceof CloseHook);
     }
 
     // ------------------------------------------------------------------

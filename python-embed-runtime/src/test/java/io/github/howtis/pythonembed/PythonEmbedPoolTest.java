@@ -1302,6 +1302,59 @@ class PythonEmbedPoolTest {
         assertEquals(42.0, num.asDouble(), 0.001);
     }
 
+    // ---- onInstanceRemoved hook ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void onInstanceRemoved_builder_registersHook() throws Exception {
+        AtomicReference<CloseReason> reason = new AtomicReference<>();
+        PythonEmbedPool hookPool = PythonEmbedPool.builder()
+                .minPool(1).maxPool(1)
+                .onInstanceRemoved((embed, r) -> reason.set(r))
+                .build();
+        try {
+            hookPool.close();
+            assertEquals(CloseReason.USER, reason.get(),
+                    "onInstanceRemoved should receive USER reason on close");
+        } finally {
+            hookPool.close();
+        }
+    }
+
+    @Test
+    void onInstanceRemoved_nullHook_isSafe() {
+        PythonEmbedPool hookPool = PythonEmbedPool.builder()
+                .minPool(1).maxPool(1)
+                .build();
+        assertDoesNotThrow(() -> hookPool.close(),
+                "Pool close should not throw when no onInstanceRemoved hook is set");
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void onInstanceRemoved_calledPerInstance_onClose() throws Exception {
+        AtomicInteger count = new AtomicInteger(0);
+        PythonEmbedPool hookPool = PythonEmbedPool.builder()
+                .minPool(1).maxPool(3)
+                .onInstanceRemoved((embed, r) -> count.incrementAndGet())
+                .build();
+        try {
+            // Scale up to 3 by submitting concurrent tasks (saturation-based)
+            CompletableFuture<?>[] futures = new CompletableFuture<?>[3];
+            for (int i = 0; i < 3; i++) {
+                futures[i] = hookPool.exec("import time; time.sleep(0.1)");
+            }
+            CompletableFuture.allOf(futures).get(5, TimeUnit.SECONDS);
+            waitForPoolSize(hookPool, 3, 5_000);
+
+            hookPool.close();
+            assertEquals(3, count.get(),
+                    "onInstanceRemoved should be called for each of the 3 instances");
+        } finally {
+            hookPool.close();
+        }
+    }
+
     /**
      * Waits for the pool to reach the given size, polling every 100ms.
      */
