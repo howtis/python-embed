@@ -20,7 +20,6 @@ Java library for embedding CPython in JVM applications. Uses a subprocess + Mess
 - **Pool**: Auto-scaling PythonEmbedPool with async CompletableFuture API
 - **Auto-restart**: minPool guarantee on crash
 - **Health check**: Periodic ping/pong with WARNING-level logging
-- **Micrometer metrics**: Pool stats, latency histograms, error rate counters
 
 ## License
 
