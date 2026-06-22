@@ -188,6 +188,18 @@ class PythonValueTest {
         assertThrows(ClassCastException.class, v::asBytes);
     }
 
+    @Test
+    void asBytes_fromMalformedBase64_throws() {
+        PythonValue v = PythonValue.of("!!!invalid!!!");
+        assertThrows(IllegalArgumentException.class, v::asBytes);
+    }
+
+    @Test
+    void asBytes_fromEmptyByteArray() {
+        PythonValue v = PythonValue.of(new byte[0]);
+        assertArrayEquals(new byte[0], v.asBytes());
+    }
+
     // ---- typed map accessors ----
 
     @Test
