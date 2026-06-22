@@ -101,6 +101,39 @@ public class PythonValue {
         return result;
     }
 
+    /**
+     * Returns the map entries as {@code Map<String, Double>}.
+     * Each value is converted via {@link #asDouble()} semantics
+     * (Number -&gt; doubleValue).
+     */
+    public Map<String, Double> asDoubleMap() {
+        return asMap(String.class, Double.class);
+    }
+
+    /**
+     * Returns the map entries as {@code Map<String, String>}.
+     * Each value is converted via {@link Object#toString()}.
+     */
+    public Map<String, String> asStringMap() {
+        return asMap(String.class, String.class);
+    }
+
+    /**
+     * Returns the map entries as {@code Map<String, Integer>}.
+     * Each value is converted via {@link Number#intValue()}.
+     */
+    public Map<String, Integer> asIntMap() {
+        return asMap(String.class, Integer.class);
+    }
+
+    /**
+     * Returns the map entries as {@code Map<String, Long>}.
+     * Each value is converted via {@link Number#longValue()}.
+     */
+    public Map<String, Long> asLongMap() {
+        return asMap(String.class, Long.class);
+    }
+
     /** Converts a map with typed keys and values. */
     @SuppressWarnings("unchecked")
     public <K, V> Map<K, V> asMap(Class<K> keyType, Class<V> valueType) {
@@ -182,7 +215,7 @@ public class PythonValue {
      * Converts a single value to the target type.
      */
     @SuppressWarnings("unchecked")
-    private static <T> T convertValue(Object value, Class<T> targetType) {
+    static <T> T convertValue(Object value, Class<T> targetType) {
         if (value == null) {
             return null;
         }

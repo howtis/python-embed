@@ -56,6 +56,16 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void call_typedArgs_noDowncasting() {
+        py.registerCallback("typed_add", new Class<?>[]{Integer.class, Integer.class},
+                args -> (Integer) args[0] + (Integer) args[1]);
+
+        PythonValue result = py.eval("_bridge.call('typed_add', 3, 4)");
+        assertEquals(7, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void call_withStringArg() {
         py.registerCallback("greet", args -> "Hello, " + args[0] + "!");
 
@@ -133,10 +143,22 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void push_typedValue_noDowncasting() throws Exception {
+        AtomicInteger received = new AtomicInteger(0);
+        py.registerPushHandler("typed_progress", Integer.class,
+                (name, value) -> received.set((Integer) value));
+
+        py.exec("_bridge.push('typed_progress', 75)");
+        Thread.sleep(200);
+        assertEquals(75, received.get());
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void push_doesNotBlockPython() {
         AtomicInteger received = new AtomicInteger(0);
-        py.registerPushHandler("log", (name, value) -> {
-            received.set(((Number) value).intValue());
+        py.registerPushHandler("log", Integer.class, (name, value) -> {
+            received.set((Integer) value);
         });
 
         // Push followed by computation should work

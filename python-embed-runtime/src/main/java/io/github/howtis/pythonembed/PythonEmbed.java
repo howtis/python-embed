@@ -621,6 +621,29 @@ public class PythonEmbed implements AutoCloseable {
     }
 
     /**
+     * Registers a callback handler with automatic argument type conversion.
+     * Each argument from Python is converted to the declared type before
+     * the handler is invoked, eliminating manual downcasting in handler bodies.
+     *
+     * <p>Only {@link Number} subtypes and {@link String} are supported as
+     * argument types. A {@link ClassCastException} is thrown at invocation
+     * time for unsupported types.
+     *
+     * @param name     the name Python uses to identify this handler
+     * @param argTypes the expected Java types for each argument
+     * @param handler  the handler that receives converted args
+     */
+    public void registerCallback(String name, Class<?>[] argTypes, CallbackHandler handler) {
+        callbackHandlers.put(name, args -> {
+            Object[] converted = new Object[args.length];
+            for (int i = 0; i < args.length && i < argTypes.length; i++) {
+                converted[i] = PythonValue.convertValue(args[i], argTypes[i]);
+            }
+            return handler.handle(converted);
+        });
+    }
+
+    /**
      * Registers a push handler that receives fire-and-forget pushes
      * from Python via {@code _bridge.push(name, value)}.
      *
@@ -629,6 +652,24 @@ public class PythonEmbed implements AutoCloseable {
      */
     public void registerPushHandler(String name, PushHandler handler) {
         pushHandlers.put(name, handler);
+    }
+
+    /**
+     * Registers a push handler with automatic value type conversion.
+     * The value from Python is converted to the declared type before
+     * the handler is invoked, eliminating manual downcasting.
+     *
+     * <p>Only {@link Number} subtypes and {@link String} are supported as
+     * the value type. A {@link ClassCastException} is thrown at invocation
+     * time for unsupported types.
+     *
+     * @param name      the name Python uses to identify this handler
+     * @param valueType the expected Java type of the push value
+     * @param handler   the handler that receives converted name and value
+     */
+    public void registerPushHandler(String name, Class<?> valueType, PushHandler handler) {
+        pushHandlers.put(name, (n, value) ->
+                handler.accept(n, PythonValue.convertValue(value, valueType)));
     }
 
     @Override

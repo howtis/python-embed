@@ -75,6 +75,8 @@ public class PythonEmbedPool implements AutoCloseable {
 
     private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
+    private final Map<String, Class<?>[]> callbackArgTypes = new ConcurrentHashMap<>();
+    private final Map<String, Class<?>> pushValueTypes = new ConcurrentHashMap<>();
     private final Thread poolCleanupHook;
 
     /**
@@ -549,8 +551,25 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     public void registerCallback(String name, CallbackHandler handler) {
         callbackHandlers.put(name, handler);
+        callbackArgTypes.remove(name);
         for (PooledInstance pi : instances) {
             pi.embed.registerCallback(name, handler);
+        }
+    }
+
+    /**
+     * Registers a callback handler with automatic argument type conversion
+     * on all current and future instances.
+     *
+     * @param name     the name Python uses to identify this handler
+     * @param argTypes the expected Java types for each argument
+     * @param handler  the handler that receives converted args
+     */
+    public void registerCallback(String name, Class<?>[] argTypes, CallbackHandler handler) {
+        callbackHandlers.put(name, handler);
+        callbackArgTypes.put(name, argTypes);
+        for (PooledInstance pi : instances) {
+            pi.embed.registerCallback(name, argTypes, handler);
         }
     }
 
@@ -564,8 +583,25 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     public void registerPushHandler(String name, PushHandler handler) {
         pushHandlers.put(name, handler);
+        pushValueTypes.remove(name);
         for (PooledInstance pi : instances) {
             pi.embed.registerPushHandler(name, handler);
+        }
+    }
+
+    /**
+     * Registers a push handler with automatic value type conversion
+     * on all current and future instances.
+     *
+     * @param name      the name Python uses to identify this handler
+     * @param valueType the expected Java type of the push value
+     * @param handler   the handler that receives converted name and value
+     */
+    public void registerPushHandler(String name, Class<?> valueType, PushHandler handler) {
+        pushHandlers.put(name, handler);
+        pushValueTypes.put(name, valueType);
+        for (PooledInstance pi : instances) {
+            pi.embed.registerPushHandler(name, valueType, handler);
         }
     }
 
@@ -732,10 +768,22 @@ public class PythonEmbedPool implements AutoCloseable {
     private PythonEmbed createEmbed() {
         PythonEmbed embed = PythonEmbed.create(options);
         for (Map.Entry<String, CallbackHandler> e : callbackHandlers.entrySet()) {
-            embed.registerCallback(e.getKey(), e.getValue());
+            String name = e.getKey();
+            Class<?>[] argTypes = callbackArgTypes.get(name);
+            if (argTypes != null) {
+                embed.registerCallback(name, argTypes, e.getValue());
+            } else {
+                embed.registerCallback(name, e.getValue());
+            }
         }
         for (Map.Entry<String, PushHandler> e : pushHandlers.entrySet()) {
-            embed.registerPushHandler(e.getKey(), e.getValue());
+            String name = e.getKey();
+            Class<?> valueType = pushValueTypes.get(name);
+            if (valueType != null) {
+                embed.registerPushHandler(name, valueType, e.getValue());
+            } else {
+                embed.registerPushHandler(name, e.getValue());
+            }
         }
         return embed;
     }

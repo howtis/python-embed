@@ -187,4 +187,73 @@ class PythonValueTest {
         PythonValue v = PythonValue.of(42);
         assertThrows(ClassCastException.class, v::asBytes);
     }
+
+    // ---- typed map accessors ----
+
+    @Test
+    void asDoubleMap_convertsNumberValues() {
+        PythonValue v = PythonValue.of(Map.of("a", 1.0, "b", 2.5));
+        Map<String, Double> map = v.asDoubleMap();
+        assertEquals(2, map.size());
+        assertEquals(1.0, map.get("a"), 0.001);
+        assertEquals(2.5, map.get("b"), 0.001);
+    }
+
+    @Test
+    void asDoubleMap_fromIntegerValues() {
+        PythonValue v = PythonValue.of(Map.of("x", 42));
+        Map<String, Double> map = v.asDoubleMap();
+        assertEquals(42.0, map.get("x"), 0.001);
+    }
+
+    @Test
+    void asStringMap_convertsValuesToString() {
+        PythonValue v = PythonValue.of(Map.of("name", "Alice", "count", 3));
+        Map<String, String> map = v.asStringMap();
+        assertEquals("Alice", map.get("name"));
+        assertEquals("3", map.get("count"));
+    }
+
+    @Test
+    void asIntMap_convertsNumberValues() {
+        PythonValue v = PythonValue.of(Map.of("a", 1.0, "b", 2.0));
+        Map<String, Integer> map = v.asIntMap();
+        assertEquals(1, map.get("a"));
+        assertEquals(2, map.get("b"));
+    }
+
+    @Test
+    void asLongMap_convertsNumberValues() {
+        PythonValue v = PythonValue.of(Map.of("a", 1.0, "b", 9999999999L));
+        Map<String, Long> map = v.asLongMap();
+        assertEquals(1L, map.get("a"));
+        assertEquals(9999999999L, map.get("b"));
+    }
+
+    @Test
+    void typedMap_emptyMap() {
+        PythonValue v = PythonValue.of(Map.of());
+        assertEquals(0, v.asDoubleMap().size());
+        assertEquals(0, v.asStringMap().size());
+        assertEquals(0, v.asIntMap().size());
+        assertEquals(0, v.asLongMap().size());
+    }
+
+    @Test
+    void typedMap_nullValues() {
+        Map<String, Object> raw = new java.util.HashMap<>();
+        raw.put("a", null);
+        PythonValue v = PythonValue.of(raw);
+        Map<String, Double> map = v.asDoubleMap();
+        assertNull(map.get("a"));
+    }
+
+    @Test
+    void typedMap_wrongType_throws() {
+        PythonValue v = PythonValue.of(List.of());
+        assertThrows(ClassCastException.class, v::asDoubleMap);
+        assertThrows(ClassCastException.class, v::asStringMap);
+        assertThrows(ClassCastException.class, v::asIntMap);
+        assertThrows(ClassCastException.class, v::asLongMap);
+    }
 }
