@@ -114,27 +114,13 @@ public abstract class VenvTask extends DefaultTask {
             }
         }
 
-        // Merge packages from pyproject.toml
+        // Resolve pyproject.toml path for fingerprint and pip (pip understands it natively)
+        Path pyprojectPath = null;
         if (pyprojectTomlFile != null && !pyprojectTomlFile.isEmpty()) {
-            Path pyprojectPath = projectRoot.resolve(pyprojectTomlFile);
+            pyprojectPath = projectRoot.resolve(pyprojectTomlFile);
             if (!Files.exists(pyprojectPath)) {
                 throw new GradleException(
                         "pyproject.toml not found: " + pyprojectPath.toAbsolutePath());
-            }
-            try {
-                List<String> tomlPackages = PyprojectTomlParser.parse(pyprojectPath);
-                packages.addAll(tomlPackages);
-                logger.info("Loaded " + tomlPackages.size() + " packages from " + pyprojectTomlFile);
-            } catch (IOException e) {
-                throw new GradleException("Failed to read pyproject.toml: " + pyprojectPath, e);
-            }
-        }
-
-        if (!packages.isEmpty()) {
-            List<String> errors = Pep440.validatePackageSpecs(packages);
-            if (!errors.isEmpty()) {
-                throw new GradleException(
-                        "Invalid package specification(s):\n  " + String.join("\n  ", errors));
             }
         }
 
@@ -145,8 +131,8 @@ public abstract class VenvTask extends DefaultTask {
         File venvDir = getVenvDir().get().getAsFile();
         logger.info("Output directory: " + venvDir.getAbsolutePath());
 
-        // Compute current package fingerprint
-        String currentPackageHash = computePackageHash(packages, pipIndexUrl, pipExtraArgs);
+        // Compute current package fingerprint (includes raw pyproject.toml content)
+        String currentPackageHash = computePackageHash(packages, pipIndexUrl, pipExtraArgs, pyprojectPath);
 
         // Check stored fingerprint for incremental rebuild
         Fingerprint stored = readFingerprint(venvDir);
@@ -191,12 +177,12 @@ public abstract class VenvTask extends DefaultTask {
 
         logger.info("Using Python: " + pythonCmd);
 
-        // Install packages if needed
-        if (!packages.isEmpty()) {
+        // Install packages if needed (pip handles pyproject.toml natively)
+        if (!packages.isEmpty() || pyprojectPath != null) {
             if (packagesMatch) {
                 logger.info("Packages up to date, skipping pip install");
             } else {
-                pipInstall(pythonCmd, packages, pipIndexUrl, pipExtraArgs);
+                pipInstall(pythonCmd, packages, pipIndexUrl, pipExtraArgs, pyprojectPath);
             }
         }
 
@@ -254,13 +240,13 @@ public abstract class VenvTask extends DefaultTask {
     }
 
     private void pipInstall(String pythonCmd, List<String> packages,
-                            String pipIndexUrl, List<String> pipExtraArgs) {
-        if (packages.isEmpty()) {
+                            String pipIndexUrl, List<String> pipExtraArgs,
+                            Path pyprojectPath) {
+        if (packages.isEmpty() && pyprojectPath == null) {
             return;
         }
         logger.info("Upgrading pip...");
         runCommand(pythonCmd, "-m", "pip", "install", "--upgrade", "pip");
-        logger.info("Installing packages: " + packages);
         List<String> args = new ArrayList<>();
         args.add(pythonCmd);
         args.add("-m");
@@ -272,11 +258,15 @@ public abstract class VenvTask extends DefaultTask {
         }
         args.addAll(pipExtraArgs);
         args.addAll(packages);
+        if (pyprojectPath != null) {
+            args.add(pyprojectPath.getParent().toString());
+        }
+        logger.info("Installing: " + args.subList(3, args.size()));
         runCommand(args.toArray(new String[0]));
     }
 
     String computePackageHash(List<String> packages, String pipIndexUrl,
-                                       List<String> pipExtraArgs) {
+                                       List<String> pipExtraArgs, Path pyprojectPath) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             List<String> sortedPackages = new ArrayList<>(packages);
@@ -292,9 +282,14 @@ public abstract class VenvTask extends DefaultTask {
             for (String arg : sortedExtraArgs) {
                 md.update(arg.getBytes(StandardCharsets.UTF_8));
             }
+            if (pyprojectPath != null) {
+                md.update(Files.readAllBytes(pyprojectPath));
+            }
             return HexFormat.of().formatHex(md.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new GradleException("SHA-256 not available", e);
+        } catch (IOException e) {
+            throw new GradleException("Failed to read pyproject.toml for fingerprint: " + pyprojectPath, e);
         }
     }
 

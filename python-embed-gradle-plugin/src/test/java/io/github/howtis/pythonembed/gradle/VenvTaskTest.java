@@ -63,46 +63,6 @@ class VenvTaskTest {
 
 
     // ------------------------------------------------------------------
-    // Package spec validation (Pep440)
-    // ------------------------------------------------------------------
-
-    @Test
-    void createVenv_invalidPackageSpec_throwsGradleException() {
-        task.getPackages().set(List.of("!invalid!package!"));
-
-        GradleException ex = assertThrows(GradleException.class, () -> task.createVenv());
-        assertTrue(ex.getMessage().contains("Invalid package specification"));
-    }
-
-    @Test
-    void createVenv_emptyPackageString_throwsGradleException() {
-        task.getPackages().set(List.of(""));
-
-        GradleException ex = assertThrows(GradleException.class, () -> task.createVenv());
-        assertTrue(ex.getMessage().contains("Invalid package specification"));
-    }
-
-    @Test
-    void createVenv_multipleInvalidPackages_reportsAllErrors() {
-        task.getPackages().set(List.of("", "!bad!"));
-
-        GradleException ex = assertThrows(GradleException.class, () -> task.createVenv());
-        String msg = ex.getMessage();
-        assertTrue(msg.contains("Invalid package specification"));
-        // Should contain both error messages
-        assertTrue(msg.contains("Package spec is empty"));
-    }
-
-    @Test
-    void createVenv_mixedValidAndInvalidPackages_throwsGradleException() {
-        task.getPackages().set(List.of("numpy", ""));
-
-        GradleException ex = assertThrows(GradleException.class, () -> task.createVenv());
-        assertTrue(ex.getMessage().contains("Invalid package specification"));
-    }
-
-
-    // ------------------------------------------------------------------
     // Task property wiring (verify task is properly configured)
     // ------------------------------------------------------------------
 
@@ -134,42 +94,42 @@ class VenvTaskTest {
 
     @Test
     void computePackageHash_sameInputs_produceSameHash() {
-        String hash1 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of());
-        String hash2 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of());
+        String hash1 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of(), null);
+        String hash2 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of(), null);
         assertEquals(hash1, hash2);
     }
 
     @Test
     void computePackageHash_differentPackages_produceDifferentHash() {
-        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of());
-        String hash2 = task.computePackageHash(List.of("pandas"), null, List.of());
+        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of(), null);
+        String hash2 = task.computePackageHash(List.of("pandas"), null, List.of(), null);
         assertNotEquals(hash1, hash2);
     }
 
     @Test
     void computePackageHash_orderIndependent() {
-        String hash1 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of());
-        String hash2 = task.computePackageHash(List.of("pandas", "numpy"), null, List.of());
+        String hash1 = task.computePackageHash(List.of("numpy", "pandas"), null, List.of(), null);
+        String hash2 = task.computePackageHash(List.of("pandas", "numpy"), null, List.of(), null);
         assertEquals(hash1, hash2);
     }
 
     @Test
     void computePackageHash_pipIndexUrl_affectsHash() {
-        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of());
-        String hash2 = task.computePackageHash(List.of("numpy"), "https://example.com/simple", List.of());
+        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of(), null);
+        String hash2 = task.computePackageHash(List.of("numpy"), "https://example.com/simple", List.of(), null);
         assertNotEquals(hash1, hash2);
     }
 
     @Test
     void computePackageHash_pipExtraArgs_affectsHash() {
-        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of());
-        String hash2 = task.computePackageHash(List.of("numpy"), null, List.of("--extra-index-url", "https://example.com"));
+        String hash1 = task.computePackageHash(List.of("numpy"), null, List.of(), null);
+        String hash2 = task.computePackageHash(List.of("numpy"), null, List.of("--extra-index-url", "https://example.com"), null);
         assertNotEquals(hash1, hash2);
     }
 
     @Test
     void computePackageHash_emptyPackages_producesValidHash() {
-        String hash = task.computePackageHash(List.of(), null, List.of());
+        String hash = task.computePackageHash(List.of(), null, List.of(), null);
         assertNotNull(hash);
         assertFalse(hash.isEmpty());
         assertEquals(64, hash.length()); // SHA-256 hex is 64 chars
@@ -194,7 +154,7 @@ class VenvTaskTest {
         // Set packages and compute expected fingerprint
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
-        String expectedHash = task.computePackageHash(packages, null, List.of());
+        String expectedHash = task.computePackageHash(packages, null, List.of(), null);
 
         // Write matching fingerprint file
         Properties fp = new Properties();
