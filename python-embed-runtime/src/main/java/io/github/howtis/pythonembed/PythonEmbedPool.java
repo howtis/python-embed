@@ -1,0 +1,1040 @@
+package io.github.howtis.pythonembed;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
+/**
+ * A pool of {@link PythonEmbed} instances that auto-scales between
+ * {@code minPool} and {@code maxPool} based on saturation.
+ *
+ * <p>When all current instances are busy and {@code currentSize < maxPool},
+ * a new instance is created (saturation-based scale up). Instances above
+ * {@code minPool} that remain idle for longer than {@code idleTimeoutMs}
+ * are removed (idle-based scale down).
+ *
+ * <p>Tasks are submitted via a shared {@link ThreadPoolExecutor} with
+ * {@code maxPool} threads. When all threads and instances are saturated,
+ * the {@link ThreadPoolExecutor.CallerRunsPolicy} provides backpressure
+ * by running tasks in the caller's thread.
+ *
+ * <pre>{@code
+ * // Fixed-size pool:
+ * try (PythonEmbedPool pool = PythonEmbedPool.builder().maxPool(4).build()) {
+ *     CompletableFuture<PythonValue> f = pool.eval("sum([1, 2, 3])");
+ *     System.out.println(f.get().asInt());
+ * }
+ *
+ * // Dynamic pool:
+ * try (PythonEmbedPool pool = PythonEmbedPool.builder()
+ *         .minPool(2).maxPool(8).build()) {
+ *     pool.exec("x = 42");
+ *     CompletableFuture<PythonValue> f = pool.eval("x * 2");
+ * }
+ *
+ * // Dynamic pool with options and custom idle timeout:
+ * PythonEmbed.Options opts = PythonEmbed.Options.builder()
+ *         .timeoutMs(60_000).build();
+ * try (PythonEmbedPool pool = PythonEmbedPool.builder()
+ *         .minPool(1).maxPool(4).idleTimeoutMs(30_000).options(opts).build()) {
+ *     pool.eval("...");
+ * }
+ * }</pre>
+ */
+public class PythonEmbedPool implements AutoCloseable {
+
+    private static final Logger logger = Logger.getLogger(PythonEmbedPool.class.getName());
+    private static final long MAINTENANCE_INTERVAL_MS = 10_000;
+
+    private final int minPool;
+    private final int maxPool;
+    private final long idleTimeoutMs;
+    private final long healthCheckIntervalMs;
+    private final PythonEmbed.Options options;
+
+    private final ThreadPoolExecutor executor;
+    private final ConcurrentLinkedDeque<PooledInstance> instances;
+    private final ScheduledExecutorService maintenanceExecutor;
+    private final AtomicInteger currentSize;
+    private final Semaphore instanceSemaphore;
+    private volatile long lastHealthCheckAt;
+    private volatile boolean closed;
+
+    private final MeterRegistry meterRegistry;
+    private PythonProtocol.SerializationSizeListener serializationSizeListener;
+
+    private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
+    private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
+
+    /**
+     * Wraps a {@link PythonEmbed} with pool bookkeeping fields.
+     */
+    static class PooledInstance {
+        final PythonEmbed embed;
+        volatile boolean busy;
+        volatile long lastUsedAt;
+
+        PooledInstance(PythonEmbed embed) {
+            this.embed = embed;
+            this.lastUsedAt = System.currentTimeMillis();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Builder
+    // ------------------------------------------------------------------
+
+    /**
+     * Returns a new {@link Builder} for constructing a {@link PythonEmbedPool}.
+     *
+     * <p>Set venv path and environment variables via
+     * {@link PythonEmbed.Options.Builder} and pass the result to
+     * {@link #options(PythonEmbed.Options)}.
+     *
+     * <p>Defaults:
+     * <ul>
+     *   <li>{@code minPool = 1}</li>
+     *   <li>{@code maxPool = 1} (fixed-size pool; set higher for auto-scaling)</li>
+     *   <li>{@code idleTimeoutMs = 60_000}</li>
+     *   <li>{@code healthCheckIntervalMs = 30_000}</li>
+     *   <li>{@code options = }{@link PythonEmbed.Options#defaults()}</li>
+     * </ul>
+     *
+     * <p>{@code maxPool} is the only truly required setting -- without it
+     * you get a single-instance pool.
+     *
+     * @return a new Builder
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private int minPool = 1;
+        private int maxPool = 1;
+        private long idleTimeoutMs = 60_000;
+        private long healthCheckIntervalMs = 30_000;
+        private PythonEmbed.Options options = PythonEmbed.Options.defaults();
+        private MeterRegistry meterRegistry = null;
+
+        public Builder minPool(int v) { this.minPool = v; return this; }
+        public Builder maxPool(int v) { this.maxPool = v; return this; }
+        public Builder idleTimeoutMs(long v) { this.idleTimeoutMs = v; return this; }
+        public Builder healthCheckIntervalMs(long v) { this.healthCheckIntervalMs = v; return this; }
+        public Builder options(PythonEmbed.Options v) { this.options = v; return this; }
+        public Builder meterRegistry(MeterRegistry v) { this.meterRegistry = v; return this; }
+
+        /**
+         * Builds a {@link PythonEmbedPool} and pre-warms it with
+         * {@code minPool} instances.
+         *
+         * @return a ready-to-use pool
+         * @throws IllegalArgumentException if {@code minPool < 1},
+         *         {@code maxPool < minPool}, {@code idleTimeoutMs < 0},
+         *         or {@code healthCheckIntervalMs < 0}
+         * @throws IOException if instance creation fails
+         */
+        public PythonEmbedPool build() throws IOException {
+            return new PythonEmbedPool(this);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Constructor
+    // ------------------------------------------------------------------
+
+    private PythonEmbedPool(Builder b) throws IOException {
+        if (b.minPool < 1) {
+            throw new IllegalArgumentException("minPool must be >= 1, got " + b.minPool);
+        }
+        if (b.maxPool < b.minPool) {
+            throw new IllegalArgumentException(
+                    "maxPool (" + b.maxPool + ") must be >= minPool (" + b.minPool + ")");
+        }
+        if (b.idleTimeoutMs < 0) {
+            throw new IllegalArgumentException("idleTimeoutMs must be >= 0");
+        }
+        if (b.healthCheckIntervalMs < 0) {
+            throw new IllegalArgumentException("healthCheckIntervalMs must be >= 0");
+        }
+
+        this.minPool = b.minPool;
+        this.maxPool = b.maxPool;
+        this.idleTimeoutMs = b.idleTimeoutMs;
+        this.healthCheckIntervalMs = b.healthCheckIntervalMs;
+        this.options = b.options;
+        this.meterRegistry = b.meterRegistry;
+
+        this.instances = new ConcurrentLinkedDeque<>();
+        this.currentSize = new AtomicInteger(0);
+        this.instanceSemaphore = new Semaphore(b.maxPool);
+
+        // Shared executor: core = maxPool so all threads stay alive.
+        // SynchronousQueue with CallerRunsPolicy provides backpressure.
+        this.executor = new ThreadPoolExecutor(
+                b.maxPool, b.maxPool,
+                60L, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
+
+        // Periodic maintenance scheduler (idle cleanup + health check)
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, r -> {
+            Thread t = new Thread(r, "python-embed-pool-maintenance");
+            t.setDaemon(true);
+            return t;
+        });
+        scheduler.setRemoveOnCancelPolicy(true);
+        this.maintenanceExecutor = scheduler;
+
+        bindMetrics();
+
+        // Create first instance synchronously for immediate availability
+        PythonEmbed firstEmbed = createEmbed();
+        instances.add(new PooledInstance(firstEmbed));
+        currentSize.incrementAndGet();
+
+        // Create remaining minPool-1 instances in background
+        if (b.minPool > 1) {
+            maintenanceExecutor.execute(this::preWarmRemaining);
+        }
+
+        this.maintenanceExecutor.scheduleWithFixedDelay(
+                this::runMaintenance,
+                MAINTENANCE_INTERVAL_MS,
+                MAINTENANCE_INTERVAL_MS,
+                TimeUnit.MILLISECONDS);
+    }
+
+    // ------------------------------------------------------------------
+    // Metrics
+    // ------------------------------------------------------------------
+
+    /**
+     * Binds all metrics to the configured {@link MeterRegistry}.
+     * No-op when no registry is configured.
+     */
+    private void bindMetrics() {
+        if (meterRegistry == null) return;
+
+        Gauge.builder("pythonembed.pool.size", currentSize, AtomicInteger::get)
+                .strongReference(true)
+                .register(meterRegistry);
+
+        Gauge.builder("pythonembed.pool.active", this, pool -> {
+                    int busy = 0;
+                    for (PooledInstance pi : instances) {
+                        if (pi.busy) busy++;
+                    }
+                    return busy;
+                })
+                .strongReference(true)
+                .register(meterRegistry);
+
+        Gauge.builder("pythonembed.pool.utilization", this, pool -> {
+                    int size = currentSize.get();
+                    if (size == 0) return 0.0;
+                    int busy = 0;
+                    for (PooledInstance pi : instances) {
+                        if (pi.busy) busy++;
+                    }
+                    return (double) busy / size;
+                })
+                .strongReference(true)
+                .register(meterRegistry);
+
+        DistributionSummary requestSize = DistributionSummary.builder("pythonembed.serialization.size")
+                .tag("direction", "request")
+                .register(meterRegistry);
+        DistributionSummary responseSize = DistributionSummary.builder("pythonembed.serialization.size")
+                .tag("direction", "response")
+                .register(meterRegistry);
+
+        serializationSizeListener = new PythonProtocol.SerializationSizeListener() {
+            @Override public void onRequestSize(int bytes) { requestSize.record(bytes); }
+            @Override public void onResponseSize(int bytes) { responseSize.record(bytes); }
+        };
+    }
+
+    private void recordTimedSuccess(Timer.Sample sample, String timerName) {
+        if (sample != null) {
+            sample.stop(meterRegistry.timer(timerName, "error", "none"));
+        }
+    }
+
+    private void recordTimedError(Timer.Sample sample, String timerName, Throwable e) {
+        if (meterRegistry != null) {
+            String type = e.getClass().getSimpleName();
+            if (sample != null) {
+                sample.stop(meterRegistry.timer(timerName, "error", type));
+            }
+            meterRegistry.counter("pythonembed.call.errors", "type", type).increment();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------
+
+    /**
+     * Evaluates a Python expression asynchronously.
+     *
+     * @param code Python expression to evaluate
+     * @return a future that completes with the result
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<PythonValue> eval(String code) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                PythonValue result = pi.embed.eval(code);
+                recordTimedSuccess(sample, "pythonembed.eval.duration");
+                return result;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.eval.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Evaluates a Python expression with a per-call timeout override.
+     *
+     * @param code Python expression to evaluate
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes with the result
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<PythonValue> eval(String code, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                PythonValue result = pi.embed.eval(code, timeoutMs);
+                recordTimedSuccess(sample, "pythonembed.eval.duration");
+                return result;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.eval.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes Python statements asynchronously.
+     * State is preserved across calls (shared namespace per instance).
+     *
+     * @param code Python statements to execute
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> exec(String code) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.exec(code);
+                recordTimedSuccess(sample, "pythonembed.exec.duration");
+                return null;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.exec.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes Python statements with a per-call timeout override.
+     *
+     * @param code Python statements to execute
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> exec(String code, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.exec(code, timeoutMs);
+                recordTimedSuccess(sample, "pythonembed.exec.duration");
+                return null;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.exec.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Evaluates multiple Python expressions asynchronously in a single batch.
+     *
+     * @param codes Python expressions to evaluate
+     * @return a future that completes with a list of results, one per expression
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<List<PythonValue>> batchEval(List<String> codes) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                List<PythonValue> result = pi.embed.batchEval(codes);
+                recordTimedSuccess(sample, "pythonembed.eval.duration");
+                return result;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.eval.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Evaluates multiple Python expressions asynchronously in a single batch
+     * with a per-call timeout override.
+     *
+     * @param codes Python expressions to evaluate
+     * @param timeoutMs timeout in milliseconds for the entire batch;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes with a list of results, one per expression
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<List<PythonValue>> batchEval(List<String> codes, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                List<PythonValue> result = pi.embed.batchEval(codes, timeoutMs);
+                recordTimedSuccess(sample, "pythonembed.eval.duration");
+                return result;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.eval.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes multiple Python statements asynchronously in a single batch.
+     *
+     * @param codes Python statements to execute
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> batchExec(List<String> codes) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.batchExec(codes);
+                recordTimedSuccess(sample, "pythonembed.exec.duration");
+                return null;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.exec.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes multiple Python statements asynchronously in a single batch
+     * with a per-call timeout override.
+     *
+     * @param codes Python statements to execute
+     * @param timeoutMs timeout in milliseconds for the entire batch;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> batchExec(List<String> codes, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.batchExec(codes, timeoutMs);
+                recordTimedSuccess(sample, "pythonembed.exec.duration");
+                return null;
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                recordTimedError(sample, "pythonembed.exec.duration", e);
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Streams results from a Python generator or iterable expression
+     * asynchronously.
+     *
+     * <p>The returned iterator blocks on {@code next()} until the next
+     * item arrives from the Python process. The underlying
+     * {@link PythonEmbed} instance remains locked for the lifetime of
+     * the iterator. Callers must exhaust or explicitly close the
+     * iterator to release the instance back to the pool.
+     *
+     * @param code a Python expression that evaluates to an iterable
+     * @return a future that completes with an iterator over the streamed values
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Iterator<PythonValue>> stream(String code) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Stream holds the instance for its entire lifetime.
+                // We don't release it in a finally block here;
+                // the iterator wrapper handles release on exhaustion/close.
+                PooledInstance pi = acquireInstance();
+                Iterator<PythonValue> raw = pi.embed.stream(code);
+                return new PooledIterator<>(raw, pi, this);
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, executor);
+    }
+
+    /**
+     * Streams results with a per-item poll timeout override.
+     *
+     * @param code a Python expression that evaluates to an iterable
+     * @param timeoutMs timeout in milliseconds per poll;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes with an iterator over the streamed values
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Iterator<PythonValue>> stream(String code, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                PooledInstance pi = acquireInstance();
+                Iterator<PythonValue> raw = pi.embed.stream(code, timeoutMs);
+                return new PooledIterator<>(raw, pi, this);
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, executor);
+    }
+
+    /**
+     * Creates a handle to a Python variable asynchronously.
+     *
+     * <p><b>Important:</b> The returned handle is bound to a specific
+     * {@link PythonEmbed} instance. If that instance is removed during
+     * idle scale-down, the handle becomes invalid. Callers should
+     * complete their work with the handle promptly.
+     *
+     * @param variableName the name of an existing Python variable
+     * @return a future that completes with the handle
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<PythonHandle> ref(String variableName) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                return pi.embed.ref(variableName);
+            } catch (PythonExecutionException | TimeoutException | IOException e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Creates a dynamic proxy that wraps a Python object as a Java interface,
+     * with each method call acquiring and releasing a pool instance.
+     *
+     * <p>Unlike {@link PythonEmbed#proxy(int, Class)}, this proxy is not
+     * tied to a single PythonEmbed instance. Each method invocation
+     * acquires an available instance from the pool, executes the call,
+     * and releases the instance back. This gives proxy users the full
+     * benefits of pool auto-scaling and health checks.
+     *
+     * <pre>{@code
+     * PythonHandle handle = pool.ref("my_object").get();
+     * MyInterface obj = pool.proxy(handle.getRefId(), MyInterface.class);
+     * String result = obj.process("input");
+     * }</pre>
+     *
+     * @param <T>            the interface type
+     * @param refId          the Python object reference ID from {@link PythonHandle#refId()}
+     * @param interfaceClass the Java interface to proxy
+     * @return a dynamic proxy implementing the given interface
+     * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T proxy(int refId, Class<T> interfaceClass) {
+        if (!interfaceClass.isInterface()) {
+            throw new IllegalArgumentException(
+                    "proxy() requires an interface, got: " + interfaceClass.getName());
+        }
+        PythonPoolProxy handler = new PythonPoolProxy(this, refId);
+        return (T) java.lang.reflect.Proxy.newProxyInstance(
+                interfaceClass.getClassLoader(),
+                new Class<?>[]{interfaceClass},
+                handler);
+    }
+
+    /**
+     * Registers a callback handler on all current and future instances.
+     * When the pool scales up, new instances automatically receive
+     * all previously registered handlers.
+     *
+     * @param name    the name Python uses to identify this handler
+     * @param handler the handler that receives args and returns a value
+     */
+    public void registerCallback(String name, CallbackHandler handler) {
+        callbackHandlers.put(name, handler);
+        for (PooledInstance pi : instances) {
+            pi.embed.registerCallback(name, handler);
+        }
+    }
+
+    /**
+     * Registers a push handler on all current and future instances.
+     * When the pool scales up, new instances automatically receive
+     * all previously registered handlers.
+     *
+     * @param name    the name Python uses to identify this handler
+     * @param handler the handler that receives name and value
+     */
+    public void registerPushHandler(String name, PushHandler handler) {
+        pushHandlers.put(name, handler);
+        for (PooledInstance pi : instances) {
+            pi.embed.registerPushHandler(name, handler);
+        }
+    }
+
+    /**
+     * Returns the current number of PythonEmbed instances in the pool.
+     */
+    public int size() {
+        return currentSize.get();
+    }
+
+    /**
+     * Returns the number of currently busy (in-use) instances.
+     */
+    public int activeCount() {
+        int count = 0;
+        for (PooledInstance pi : instances) {
+            if (pi.busy) count++;
+        }
+        return count;
+    }
+
+    /**
+     * Returns the configured minimum pool size.
+     */
+    public int minPool() {
+        return minPool;
+    }
+
+    /**
+     * Returns the configured maximum pool size.
+     */
+    public int maxPool() {
+        return maxPool;
+    }
+
+    // ------------------------------------------------------------------
+    // Lifecycle
+    // ------------------------------------------------------------------
+
+    @Override
+    public void close() {
+        close(5, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Gracefully shuts down the pool with a configurable timeout per instance.
+     *
+     * @param timeout the maximum time to wait for each instance's graceful shutdown
+     * @param unit the time unit of the timeout argument
+     */
+    public void close(long timeout, TimeUnit unit) {
+        if (closed) return;
+        closed = true;
+
+        // Stop accepting new work
+        maintenanceExecutor.shutdownNow();
+        executor.shutdown();
+
+        // Close all instances with the given timeout
+        for (PooledInstance pi : instances) {
+            try {
+                pi.embed.close(timeout, unit);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Error closing pooled PythonEmbed", e);
+            }
+        }
+        instances.clear();
+        currentSize.set(0);
+    }
+
+    // ------------------------------------------------------------------
+    // Internal: instance management
+    // ------------------------------------------------------------------
+
+    /**
+     * Acquires an available PythonEmbed instance, blocking if all are
+     * busy and the pool is at max capacity.
+     *
+     * <p>Strategy:
+     * <ol>
+     *   <li>Acquire a semaphore permit (limits to maxPool concurrent users)</li>
+     *   <li>Scan for an idle instance -- if found, mark busy and return</li>
+     *   <li>If none idle and currentSize &lt; maxPool, create a new instance
+     *       (saturation-based scale up)</li>
+     *   <li>If at maxPool, spin-yield until an instance is released
+     *       (rare, only when semaphore and instance state briefly diverge)</li>
+     * </ol>
+     */
+    PooledInstance acquireInstance() throws IOException {
+        if (closed) {
+            throw new IllegalStateException("Pool is closed");
+        }
+
+        try {
+            instanceSemaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for Python instance", e);
+        }
+
+        while (true) {
+            // 1. Try to find an idle instance
+            for (PooledInstance pi : instances) {
+                if (!pi.busy && pi.embed.isOpen()) {
+                    synchronized (pi) {
+                        if (!pi.busy) {
+                            pi.busy = true;
+                            pi.lastUsedAt = System.currentTimeMillis();
+                            return pi;
+                        }
+                    }
+                }
+            }
+
+            // 2. All instances busy -- try to create a new one (saturation-based scale up)
+            int current = currentSize.get();
+            if (current < maxPool) {
+                if (currentSize.compareAndSet(current, current + 1)) {
+                    try {
+                        PythonEmbed embed = createEmbed();
+                        PooledInstance pi = new PooledInstance(embed);
+                        pi.busy = true;
+                        pi.lastUsedAt = System.currentTimeMillis();
+                        instances.add(pi);
+                        return pi;
+                    } catch (IOException e) {
+                        currentSize.decrementAndGet();
+                        instanceSemaphore.release();
+                        throw e;
+                    }
+                }
+                // CAS failed -- another thread created an instance; retry to find it
+                continue;
+            }
+
+            // 3. At maxPool but no idle instance found yet.
+            //    This is a rare transient race: the semaphore says a slot
+            //    is free, but the corresponding instance hasn't been marked
+            //    idle yet. Yield and retry.
+            Thread.yield();
+        }
+    }
+
+    /**
+     * Returns an instance to the pool, marking it as idle.
+     */
+    void releaseInstance(PooledInstance pi) {
+        pi.busy = false;
+        pi.lastUsedAt = System.currentTimeMillis();
+        instanceSemaphore.release();
+    }
+
+    /**
+     * Creates a new PythonEmbed instance with stored options and
+     * registers all pending callback/push handlers.
+     */
+    private PythonEmbed createEmbed() throws IOException {
+        PythonEmbed embed = PythonEmbed.create(options);
+        if (serializationSizeListener != null) {
+            embed.setSerializationSizeListener(serializationSizeListener);
+        }
+        for (Map.Entry<String, CallbackHandler> e : callbackHandlers.entrySet()) {
+            embed.registerCallback(e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, PushHandler> e : pushHandlers.entrySet()) {
+            embed.registerPushHandler(e.getKey(), e.getValue());
+        }
+        return embed;
+    }
+
+    /**
+     * Runs periodic maintenance: idle instance cleanup and health checks.
+     */
+    void runMaintenance() {
+        if (closed) return;
+
+        cleanupIdleInstances();
+
+        if (healthCheckIntervalMs > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastHealthCheckAt >= healthCheckIntervalMs) {
+                healthCheck();
+                lastHealthCheckAt = now;
+            }
+        }
+
+        ensureMinPool();
+    }
+
+    /**
+     * Background task to create remaining instances up to minPool.
+     * Safe to call multiple times: ensureMinPool is a no-op once
+     * currentSize >= minPool.
+     */
+    private void preWarmRemaining() {
+        ensureMinPool();
+    }
+
+    /**
+     * Periodically removes idle instances above minPool.
+     */
+    private void cleanupIdleInstances() {
+        long now = System.currentTimeMillis();
+        Iterator<PooledInstance> it = instances.iterator();
+        while (it.hasNext()) {
+            PooledInstance pi = it.next();
+            if (currentSize.get() <= minPool) break;
+            if (!pi.busy && (now - pi.lastUsedAt) > idleTimeoutMs) {
+                synchronized (pi) {
+                    if (!pi.busy && (now - pi.lastUsedAt) > idleTimeoutMs) {
+                        if (currentSize.decrementAndGet() >= minPool) {
+                            it.remove();
+                            try {
+                                pi.embed.close();
+                            } catch (Exception e) {
+                                logger.log(Level.WARNING, "Error closing idle instance", e);
+                            }
+                        } else {
+                            currentSize.incrementAndGet(); // rollback
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs a health check on all idle instances and removes unhealthy ones.
+     *
+     * <p>An instance is considered unhealthy if it fails to respond to
+     * a ping within the configured timeout.
+     *
+     * @return the number of unhealthy instances removed
+     */
+    public int healthCheck() {
+        if (closed) return 0;
+
+        int removed = 0;
+        Iterator<PooledInstance> it = instances.iterator();
+        while (it.hasNext()) {
+            PooledInstance pi = it.next();
+            if (pi.busy) continue;
+
+            boolean healthy = true;
+            try {
+                healthy = pi.embed.ping();
+                if (healthy) {
+                    try {
+                        HealthInfo hi = pi.embed.health();
+                        logger.info("Health check OK: memoryRss=" + hi.memoryRssKb()
+                                + "KB, refs=" + hi.refCount()
+                                + ", gcEnabled=" + hi.gcEnabled()
+                                + ", gcCounts=" + hi.gcCounts());
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Health check OK but detail collection failed", e);
+                    }
+                } else {
+                    logger.warning("Health check failed for instance: ping returned unexpected response");
+                }
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Health check failed for instance", e);
+                healthy = false;
+            }
+
+            if (!healthy) {
+                synchronized (pi) {
+                    if (!pi.busy) {
+                        it.remove();
+                        removed++;
+                        currentSize.decrementAndGet();
+                        instanceSemaphore.release();
+                        try {
+                            pi.embed.close();
+                        } catch (Exception e) {
+                            logger.log(Level.WARNING, "Error closing unhealthy instance", e);
+                        }
+                    }
+                }
+            }
+        }
+        if (removed > 0) {
+            logger.info("Health check removed " + removed + " unhealthy instance(s)");
+        }
+        return removed;
+    }
+
+    /**
+     * Ensures the pool has at least {@code minPool} instances,
+     * creating new ones to replace any that were removed by health checks
+     * or unexpected crashes.
+     */
+    private void ensureMinPool() {
+        if (closed) return;
+
+        int current;
+        while ((current = currentSize.get()) < minPool) {
+            if (currentSize.compareAndSet(current, current + 1)) {
+                try {
+                    PythonEmbed embed = createEmbed();
+                    instances.add(new PooledInstance(embed));
+                } catch (IOException e) {
+                    currentSize.decrementAndGet();
+                    logger.log(Level.WARNING,
+                            "Failed to create instance for minPool guarantee", e);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void checkOpen() {
+        if (closed) {
+            throw new IllegalStateException("Pool is closed");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Internal: stream iterator wrapper
+    // ------------------------------------------------------------------
+
+    /**
+     * Wraps a raw PythonValue iterator so that the pooled instance is
+     * released back to the pool when the iterator is exhausted.
+     */
+    private static class PooledIterator<T> implements Iterator<T> {
+        private final Iterator<T> delegate;
+        private final PooledInstance instance;
+        private final PythonEmbedPool pool;
+        private boolean released;
+
+        PooledIterator(Iterator<T> delegate, PooledInstance instance, PythonEmbedPool pool) {
+            this.delegate = delegate;
+            this.instance = instance;
+            this.pool = pool;
+        }
+
+        @Override
+        public boolean hasNext() {
+            boolean has = delegate.hasNext();
+            if (!has) {
+                release();
+            }
+            return has;
+        }
+
+        @Override
+        public T next() {
+            try {
+                return delegate.next();
+            } catch (Exception e) {
+                release();
+                throw e;
+            }
+        }
+
+        private void release() {
+            if (!released) {
+                released = true;
+                pool.releaseInstance(instance);
+            }
+        }
+    }
+}

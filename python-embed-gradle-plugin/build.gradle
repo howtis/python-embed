@@ -10,8 +10,8 @@ repositories {
 gradlePlugin {
     plugins {
         pythonEmbed {
-            id = 'com.example.python-embed'
-            implementationClass = 'com.example.pythonembed.gradle.PythonEmbedPlugin'
+            id = 'io.github.howtis.python-embed'
+            implementationClass = 'io.github.howtis.pythonembed.gradle.PythonEmbedPlugin'
         }
     }
 }

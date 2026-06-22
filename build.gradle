@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group = 'com.example'
+group = 'io.github.howtis'
 version = '1.0.0-SNAPSHOT'
 
 subprojects {

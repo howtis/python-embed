@@ -1,5 +1,5 @@
 plugins {
-    id 'com.example.python-embed'
+    id 'io.github.howtis.python-embed'
 }
 
 dependencies {
