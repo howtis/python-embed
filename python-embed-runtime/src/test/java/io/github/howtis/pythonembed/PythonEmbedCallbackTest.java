@@ -146,7 +146,7 @@ class PythonEmbedCallbackTest {
     void push_typedValue_noDowncasting() throws Exception {
         AtomicInteger received = new AtomicInteger(0);
         py.registerPushHandler("typed_progress", Integer.class,
-                (name, value) -> received.set((Integer) value));
+                (name, value) -> received.set(value));
 
         py.exec("_bridge.push('typed_progress', 75)");
         Thread.sleep(200);
@@ -158,7 +158,7 @@ class PythonEmbedCallbackTest {
     void push_doesNotBlockPython() {
         AtomicInteger received = new AtomicInteger(0);
         py.registerPushHandler("log", Integer.class, (name, value) -> {
-            received.set((Integer) value);
+            received.set(value);
         });
 
         // Push followed by computation should work

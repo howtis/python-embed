@@ -663,14 +663,73 @@ public class PythonEmbed implements AutoCloseable {
      * the value type. A {@link ClassCastException} is thrown at invocation
      * time for unsupported types.
      *
+     * @param <T>       the type of the push value
      * @param name      the name Python uses to identify this handler
      * @param valueType the expected Java type of the push value
      * @param handler   the handler that receives converted name and value
      */
-    public void registerPushHandler(String name, Class<?> valueType, PushHandler handler) {
-        pushHandlers.put(name, (n, value) ->
-                handler.accept(n, PythonValue.convertValue(value, valueType)));
+    @SuppressWarnings("unchecked")
+    public <T> void registerPushHandler(String name, Class<T> valueType, PushHandler<T> handler) {
+        pushHandlers.put(name, (n, value) -> {
+            try {
+                handler.accept(n, PythonValue.convertValue(value, valueType));
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Push handler '" + name + "' threw", e);
+            }
+        });
     }
+
+    /**
+     * Registers a callback handler with a single typed argument.
+     * The argument from Python is converted to the declared type before
+     * the handler is invoked, eliminating manual downcasting.
+     *
+     * @param <A>     the type of the single argument
+     * @param name    the name Python uses to identify this handler
+     * @param aType   the expected Java type of the argument
+     * @param handler the handler that receives the typed argument
+     */
+    @SuppressWarnings("unchecked")
+    public <A> void registerCallback(String name, Class<A> aType, CallbackHandler1<A> handler) {
+        registerCallback(name, new Class[]{aType}, args -> handler.handle((A) args[0]));
+    }
+
+    /**
+     * Registers a callback handler with two typed arguments.
+     * Each argument from Python is converted to the declared type before
+     * the handler is invoked, eliminating manual downcasting.
+     *
+     * @param <A>     the type of the first argument
+     * @param <B>     the type of the second argument
+     * @param name    the name Python uses to identify this handler
+     * @param aType   the expected Java type of the first argument
+     * @param bType   the expected Java type of the second argument
+     * @param handler the handler that receives the typed arguments
+     */
+    @SuppressWarnings("unchecked")
+    public <A, B> void registerCallback(String name, Class<A> aType, Class<B> bType, CallbackHandler2<A, B> handler) {
+        registerCallback(name, new Class[]{aType, bType}, args -> handler.handle((A) args[0], (B) args[1]));
+    }
+
+    /**
+     * Registers a callback handler with three typed arguments.
+     * Each argument from Python is converted to the declared type before
+     * the handler is invoked, eliminating manual downcasting.
+     *
+     * @param <A>     the type of the first argument
+     * @param <B>     the type of the second argument
+     * @param <C>     the type of the third argument
+     * @param name    the name Python uses to identify this handler
+     * @param aType   the expected Java type of the first argument
+     * @param bType   the expected Java type of the second argument
+     * @param cType   the expected Java type of the third argument
+     * @param handler the handler that receives the typed arguments
+     */
+    @SuppressWarnings("unchecked")
+    public <A, B, C> void registerCallback(String name, Class<A> aType, Class<B> bType, Class<C> cType, CallbackHandler3<A, B, C> handler) {
+        registerCallback(name, new Class[]{aType, bType, cType}, args -> handler.handle((A) args[0], (B) args[1], (C) args[2]));
+    }
+
 
     @Override
     public void close() {
