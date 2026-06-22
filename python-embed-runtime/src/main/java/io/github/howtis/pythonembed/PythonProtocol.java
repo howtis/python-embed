@@ -497,10 +497,10 @@ abstract class PythonProtocol {
 
     /**
      * Sends a stream request with a per-item poll timeout override.
-     * When timeoutMs &lt;= 0, falls back to the configured default timeout.
+     * When pollTimeoutMs &lt;= 0, falls back to the configured default timeout.
      */
-    Iterator<PythonValue> sendStream(Writer writer, String code, long timeoutMs) throws java.io.IOException {
-        long effectiveTimeout = timeoutMs > 0 ? timeoutMs : this.timeoutMs;
+    Iterator<PythonValue> sendStream(Writer writer, String code, long pollTimeoutMs) throws java.io.IOException {
+        long effectiveTimeout = pollTimeoutMs > 0 ? pollTimeoutMs : this.timeoutMs;
         int id = nextId();
         byte[] request = buildStreamRequest(id, code);
         BlockingQueue<PythonValue> queue = new LinkedBlockingQueue<>();

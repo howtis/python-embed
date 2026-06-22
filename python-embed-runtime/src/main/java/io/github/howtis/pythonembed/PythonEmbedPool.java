@@ -457,17 +457,17 @@ public class PythonEmbedPool implements AutoCloseable {
      * Streams results with a per-item poll timeout override.
      *
      * @param code a Python expression that evaluates to an iterable
-     * @param timeoutMs timeout in milliseconds per poll;
-     *                  when &lt;= 0, uses the configured default timeout
+     * @param pollTimeoutMs timeout in milliseconds per poll;
+     *                      when &lt;= 0, uses the configured default timeout
      * @return a future that completes with an iterator over the streamed values
      * @throws IllegalStateException if the pool is closed
      */
-    public CompletableFuture<Iterator<PythonValue>> stream(String code, long timeoutMs) {
+    public CompletableFuture<Iterator<PythonValue>> stream(String code, long pollTimeoutMs) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
             try {
                 PooledInstance pi = acquireInstance();
-                Iterator<PythonValue> raw = pi.embed.stream(code, timeoutMs);
+                Iterator<PythonValue> raw = pi.embed.stream(code, pollTimeoutMs);
                 return new PooledIterator<>(raw, pi, this);
             } catch (Exception e) {
                 throw new CompletionException(e);
@@ -769,9 +769,9 @@ public class PythonEmbedPool implements AutoCloseable {
         while (it.hasNext()) {
             PooledInstance pi = it.next();
             if (currentSize.get() <= minPool) break;
-            if (!pi.busy && (now - pi.lastUsedAt) > idleTimeoutMs) {
+            if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                 synchronized (pi) {
-                    if (!pi.busy && (now - pi.lastUsedAt) > idleTimeoutMs) {
+                    if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                         if (currentSize.decrementAndGet() >= minPool) {
                             it.remove();
                             try {

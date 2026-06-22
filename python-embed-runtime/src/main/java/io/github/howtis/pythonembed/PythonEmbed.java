@@ -49,13 +49,6 @@ import java.util.logging.Logger;
  *                 .venvPath(Path.of("/opt/myapp/venv")).build())) {
  *     py.exec("import numpy as np");
  * }
- *
- * // With GPU support:
- * try (PythonEmbed py = PythonEmbed.create(
- *         Options.builder()
- *                 .env(Map.of("CUDA_VISIBLE_DEVICES", "0")).build())) {
- *     py.exec("import torch; print(torch.cuda.is_available())");
- * }
  * }</pre>
  */
 public class PythonEmbed implements AutoCloseable {
@@ -105,18 +98,15 @@ public class PythonEmbed implements AutoCloseable {
      * // With explicit venv:
      * PythonEmbed py = PythonEmbed.create(
      *         Options.builder().venvPath(Path.of("/opt/venv")).build());
-     *
-     * // With GPU support:
-     * PythonEmbed py = PythonEmbed.create(
-     *         Options.builder()
-     *                 .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
-     *                 .build());
      * }</pre>
      *
-     * @param options consolidated configuration (venv path, env, timeouts, etc.)
      * @return a ready-to-use PythonEmbed instance
      * @throws PythonExecutionException if venv extraction or process startup fails
      */
+    public static PythonEmbed create() {
+        return create(Options.defaults());
+    }
+
     public static PythonEmbed create(Options options) {
         try {
             PythonEmbed embed = new PythonEmbed(options);
@@ -556,14 +546,14 @@ public class PythonEmbed implements AutoCloseable {
      * Streams results with a per-item poll timeout override.
      *
      * @param code a Python expression that evaluates to an iterable
-     * @param timeoutMs timeout in milliseconds per poll;
-     *                  when &lt;= 0, uses the configured default timeout
+     * @param pollTimeoutMs timeout in milliseconds per poll;
+     *                      when &lt;= 0, uses the configured default timeout
      * @return an iterator over the streamed values
      * @throws PythonExecutionException if the stream request fails
      */
-    public Iterator<PythonValue> stream(String code, long timeoutMs) {
+    public Iterator<PythonValue> stream(String code, long pollTimeoutMs) {
         try {
-            return protocol.sendStream(writer, code, timeoutMs);
+            return protocol.sendStream(writer, code, pollTimeoutMs);
         } catch (IOException e) {
             throw PythonExecutionException.wrap("stream", e);
         }
