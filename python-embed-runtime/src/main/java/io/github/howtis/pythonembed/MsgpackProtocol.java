@@ -188,9 +188,6 @@ final class MsgpackProtocol extends PythonProtocol {
 
     @Override
     void handleResponse(byte[] raw) {
-        if (serializationSizeListener != null) {
-            serializationSizeListener.onResponseSize(raw.length);
-        }
         try {
             Map<String, Object> map = unpackMap(raw);
             int id = ((Number) map.get("id")).intValue();
@@ -285,9 +282,6 @@ final class MsgpackProtocol extends PythonProtocol {
             frame[2] = (byte) (payload.length >>> 8);
             frame[3] = (byte) (payload.length);
             System.arraycopy(payload, 0, frame, 4, payload.length);
-            if (serializationSizeListener != null) {
-                serializationSizeListener.onRequestSize(frame.length);
-            }
             return frame;
         } catch (IOException e) {
             throw new RuntimeException("MessagePack packing failed", e);

@@ -45,8 +45,9 @@ class PythonEmbedProxyTest {
 
     @BeforeAll
     static void setUp() throws Exception {
-        py = PythonEmbed.builder()
-                .venvPath(Path.of("build", "python-venv")).build();
+        py = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv")).build());
     }
 
     @AfterAll

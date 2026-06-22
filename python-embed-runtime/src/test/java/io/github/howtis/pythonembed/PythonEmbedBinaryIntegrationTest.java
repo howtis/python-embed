@@ -24,8 +24,9 @@ class PythonEmbedBinaryIntegrationTest {
 
     @BeforeAll
     static void setUp() throws Exception {
-        py = PythonEmbed.builder()
-                .venvPath(Path.of("build", "python-venv")).build();
+        py = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv")).build());
     }
 
     @AfterAll
@@ -320,8 +321,9 @@ class PythonEmbedBinaryIntegrationTest {
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void handlesReleasedOnPythonEmbedClose() throws Exception {
         // All handles should be released when PythonEmbed is closed
-        PythonEmbed py2 = PythonEmbed.builder()
-                .venvPath(Path.of("build", "python-venv")).build();
+        PythonEmbed py2 = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv")).build());
         py2.exec("x = [1, 2, 3]");
         PythonHandle handle = py2.ref("x");
         assertEquals("list", handle.pythonType());

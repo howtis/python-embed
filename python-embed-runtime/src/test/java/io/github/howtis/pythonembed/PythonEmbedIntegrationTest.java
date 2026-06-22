@@ -26,7 +26,7 @@ class PythonEmbedIntegrationTest {
 
     @BeforeAll
     static void setUp() throws Exception {
-        py = PythonEmbed.builder().build();
+        py = PythonEmbed.create(PythonEmbed.Options.defaults());
     }
 
     @AfterAll
@@ -171,9 +171,10 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_maxCodeLength_rejectsOversizedCode() throws Exception {
-        try (PythonEmbed py2 = PythonEmbed.builder()
-                .maxCodeLength(10)
-                .build()) {
+        try (PythonEmbed py2 = PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .maxCodeLength(10)
+                                .build())) {
             PythonExecutionException ex = assertThrows(
                     PythonExecutionException.class,
                     () -> py2.eval("12345678901")
@@ -185,9 +186,10 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_maxCodeLength_allowsCodeWithinLimit() throws Exception {
-        try (PythonEmbed py2 = PythonEmbed.builder()
-                .maxCodeLength(10)
-                .build()) {
+        try (PythonEmbed py2 = PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .maxCodeLength(10)
+                                .build())) {
             PythonValue result = py2.eval("42");
             assertEquals(42, result.asInt());
         }
@@ -196,9 +198,10 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_startupTimeout_succeedsWithValidProcess() throws Exception {
-        try (PythonEmbed py2 = PythonEmbed.builder()
-                .startupTimeoutMs(10_000)
-                .build()) {
+        try (PythonEmbed py2 = PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .startupTimeoutMs(10_000)
+                                .build())) {
             assertTrue(py2.eval("True").asBoolean());
         }
     }
@@ -207,10 +210,11 @@ class PythonEmbedIntegrationTest {
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_startupTimeout_failsWithInvalidExecutable() {
         assertThrows(IOException.class, () -> {
-            try (PythonEmbed py2 = PythonEmbed.builder()
-                    .pythonExecutable("/nonexistent/python")
-                    .startupTimeoutMs(3_000)
-                    .build()) {
+            try (PythonEmbed py2 = PythonEmbed.create(
+                            PythonEmbed.Options.builder()
+                                    .pythonExecutable("/nonexistent/python")
+                                    .startupTimeoutMs(3_000)
+                                    .build())) {
                 py2.eval("True");
             }
         });
@@ -219,9 +223,10 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_customTimeout_takesEffect() throws Exception {
-        try (PythonEmbed py2 = PythonEmbed.builder()
-                .timeoutMs(60_000)
-                .build()) {
+        try (PythonEmbed py2 = PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .timeoutMs(60_000)
+                                .build())) {
             assertEquals(42, py2.eval("42").asInt());
         }
     }
@@ -229,7 +234,7 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_defaults_workWithoutBuilder() throws Exception {
-        try (PythonEmbed py2 = PythonEmbed.builder().build()) {
+        try (PythonEmbed py2 = PythonEmbed.create(PythonEmbed.Options.defaults())) {
             assertEquals(42, py2.eval("42").asInt());
         }
     }
@@ -238,9 +243,10 @@ class PythonEmbedIntegrationTest {
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_withExplicitVenvPath() {
         // Test that builder with a non-existent venv path throws IOException
-        assertThrows(IOException.class, () -> PythonEmbed.builder()
-                .venvPath(Path.of("/nonexistent/venv"))
-                .build());
+        assertThrows(IOException.class, () -> PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("/nonexistent/venv"))
+                        .build()));
     }
 
     // ---- Ping / health check tests ----
@@ -552,10 +558,11 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void warmup_importsModule() throws Exception {
-        PythonEmbed embed = PythonEmbed.builder()
-                .warmupScript("import math")
-                .venvPath(Path.of("build", "python-venv"))
-                .build();
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .warmupScript("import math")
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
         try {
             PythonValue result = embed.eval("math.pi");
             assertEquals(3.141592653589793, result.asDouble(), 0.0001);
@@ -567,10 +574,11 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void warmup_scriptFailureDoesNotBreakInstance() throws Exception {
-        PythonEmbed embed = PythonEmbed.builder()
-                .warmupScript("raise RuntimeError('test warmup error')")
-                .venvPath(Path.of("build", "python-venv"))
-                .build();
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .warmupScript("raise RuntimeError('test warmup error')")
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
         try {
             PythonValue result = embed.eval("42");
             assertEquals(42, result.asInt());
@@ -582,8 +590,9 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void warmup_explicitMethodCall() throws Exception {
-        PythonEmbed embed = PythonEmbed.builder()
-                .venvPath(Path.of("build", "python-venv")).build();
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv")).build());
         try {
             embed.warmup("import math");
             PythonValue result = embed.eval("math.factorial(5)");
@@ -708,10 +717,11 @@ class PythonEmbedIntegrationTest {
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void warmup_lenientWarmupDefault_doesNotThrowOnError() throws Exception {
         // Default lenientWarmup=true: warmup failure should not prevent startup
-        PythonEmbed embed = PythonEmbed.builder()
-                .warmupScript("raise RuntimeError('warmup error')")
-                .venvPath(Path.of("build", "python-venv"))
-                .build();
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .warmupScript("raise RuntimeError('warmup error')")
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
         try {
             PythonValue result = embed.eval("42");
             assertEquals(42, result.asInt());
@@ -725,11 +735,12 @@ class PythonEmbedIntegrationTest {
     void warmup_strictMode_throwsOnError() {
         assertThrows(
                 IOException.class,
-                () -> PythonEmbed.builder()
-                        .warmupScript("raise RuntimeError('warmup error')")
-                        .lenientWarmup(false)
-                        .venvPath(Path.of("build", "python-venv"))
-                        .build()
+                () -> PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .warmupScript("raise RuntimeError('warmup error')")
+                                .lenientWarmup(false)
+                                .venvPath(Path.of("build", "python-venv"))
+                                .build())
         );
     }
 

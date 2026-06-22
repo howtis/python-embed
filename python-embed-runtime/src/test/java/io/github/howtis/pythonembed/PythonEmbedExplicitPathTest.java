@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link PythonEmbed#builder()} with explicit venv path,
+ * Tests with explicit venv path,
  * using the venv created by the Gradle plugin at build time.
  */
 class PythonEmbedExplicitPathTest {
@@ -35,8 +35,9 @@ class PythonEmbedExplicitPathTest {
             py = null;
             return;
         }
-        py = PythonEmbed.builder()
-                .venvPath(venvPath).build();
+        py = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(venvPath).build());
     }
 
     @AfterEach
@@ -89,8 +90,9 @@ class PythonEmbedExplicitPathTest {
             return;
         }
         Map<String, String> env = Map.of("TEST_VAR", "hello_from_java");
-        try (PythonEmbed pyWithEnv = PythonEmbed.builder()
-                .venvPath(venvPath).env(env).build()) {
+        try (PythonEmbed pyWithEnv = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(venvPath).env(env).build())) {
             pyWithEnv.exec("import os");
             PythonValue result = pyWithEnv.eval("os.environ.get('TEST_VAR', 'NOT_FOUND')");
             assertEquals("hello_from_java", result.asString());
@@ -101,8 +103,9 @@ class PythonEmbedExplicitPathTest {
     void create_nonexistentPath_throwsIOException() {
         Path nonexistent = Path.of("/nonexistent/python-embed-venv-" + System.nanoTime());
         IOException ex = assertThrows(IOException.class,
-                () -> PythonEmbed.builder()
-                        .venvPath(nonexistent).build());
+                () -> PythonEmbed.create(
+                        PythonEmbed.Options.builder()
+                                .venvPath(nonexistent).build()));
         assertTrue(ex.getMessage().contains("does not exist"));
     }
 
@@ -170,8 +173,9 @@ class PythonEmbedExplicitPathTest {
         if (!venvPath.toFile().exists()) {
             return;
         }
-        PythonEmbed localPy = PythonEmbed.builder()
-                .venvPath(venvPath).build();
+        PythonEmbed localPy = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(venvPath).build());
         localPy.close(1, TimeUnit.SECONDS);
     }
 
@@ -204,9 +208,7 @@ class PythonEmbedExplicitPathTest {
     void registerPushHandler_pythonPushesValue() throws Exception {
         assumeVenvExists();
         final Object[] received = new Object[1];
-        py.registerPushHandler("notify", (name, value) -> {
-            received[0] = value;
-        });
+        py.registerPushHandler("notify", (name, value) -> received[0] = value);
         py.exec("_bridge.push('notify', 'pushed-value')");
         // Give the push a moment to propagate
         Thread.sleep(200);
@@ -224,10 +226,11 @@ class PythonEmbedExplicitPathTest {
         if (!venvPath.toFile().exists()) {
             return;
         }
-        try (PythonEmbed pyOpts = PythonEmbed.builder()
-                .timeoutMs(60_000)
-                .venvPath(venvPath)
-                .build()) {
+        try (PythonEmbed pyOpts = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .timeoutMs(60_000)
+                        .venvPath(venvPath)
+                        .build())) {
             assertEquals(42, pyOpts.eval("42").asInt());
         }
     }

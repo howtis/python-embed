@@ -19,12 +19,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-
 /**
  * A pool of {@link PythonEmbed} instances that auto-scales between
  * {@code minPool} and {@code maxPool} based on saturation.
@@ -81,9 +75,6 @@ public class PythonEmbedPool implements AutoCloseable {
     private volatile long lastHealthCheckAt;
     private volatile boolean closed;
 
-    private final MeterRegistry meterRegistry;
-    private PythonProtocol.SerializationSizeListener serializationSizeListener;
-
     private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
     private final Thread poolCleanupHook;
@@ -137,14 +128,12 @@ public class PythonEmbedPool implements AutoCloseable {
         private long idleTimeoutMs = 60_000;
         private long healthCheckIntervalMs = 30_000;
         private PythonEmbed.Options options = PythonEmbed.Options.defaults();
-        private MeterRegistry meterRegistry = null;
 
         public Builder minPool(int v) { this.minPool = v; return this; }
         public Builder maxPool(int v) { this.maxPool = v; return this; }
         public Builder idleTimeoutMs(long v) { this.idleTimeoutMs = v; return this; }
         public Builder healthCheckIntervalMs(long v) { this.healthCheckIntervalMs = v; return this; }
         public Builder options(PythonEmbed.Options v) { this.options = v; return this; }
-        public Builder meterRegistry(MeterRegistry v) { this.meterRegistry = v; return this; }
 
         /**
          * Builds a {@link PythonEmbedPool} and pre-warms it with
@@ -185,7 +174,6 @@ public class PythonEmbedPool implements AutoCloseable {
         this.idleTimeoutMs = b.idleTimeoutMs;
         this.healthCheckIntervalMs = b.healthCheckIntervalMs;
         this.options = b.options;
-        this.meterRegistry = b.meterRegistry;
 
         this.instances = new ConcurrentLinkedDeque<>();
         this.currentSize = new AtomicInteger(0);
@@ -208,8 +196,6 @@ public class PythonEmbedPool implements AutoCloseable {
         scheduler.setRemoveOnCancelPolicy(true);
         this.maintenanceExecutor = scheduler;
 
-        bindMetrics();
-
         // Create first instance synchronously for immediate availability
         PythonEmbed firstEmbed = createEmbed();
         instances.add(new PooledInstance(firstEmbed));
@@ -217,7 +203,7 @@ public class PythonEmbedPool implements AutoCloseable {
 
         // Create remaining minPool-1 instances in background
         if (b.minPool > 1) {
-            maintenanceExecutor.execute(this::preWarmRemaining);
+            maintenanceExecutor.execute(this::ensureMinPool);
         }
 
         this.maintenanceExecutor.scheduleWithFixedDelay(
@@ -229,72 +215,6 @@ public class PythonEmbedPool implements AutoCloseable {
         // Ensure all Python subprocesses are cleaned up on JVM exit
         poolCleanupHook = new Thread(this::close, "python-embed-pool-cleanup");
         Runtime.getRuntime().addShutdownHook(poolCleanupHook);
-    }
-
-    // ------------------------------------------------------------------
-    // Metrics
-    // ------------------------------------------------------------------
-
-    /**
-     * Binds all metrics to the configured {@link MeterRegistry}.
-     * No-op when no registry is configured.
-     */
-    private void bindMetrics() {
-        if (meterRegistry == null) return;
-
-        Gauge.builder("pythonembed.pool.size", currentSize, AtomicInteger::get)
-                .strongReference(true)
-                .register(meterRegistry);
-
-        Gauge.builder("pythonembed.pool.active", this, pool -> {
-                    int busy = 0;
-                    for (PooledInstance pi : instances) {
-                        if (pi.busy) busy++;
-                    }
-                    return busy;
-                })
-                .strongReference(true)
-                .register(meterRegistry);
-
-        Gauge.builder("pythonembed.pool.utilization", this, pool -> {
-                    int size = currentSize.get();
-                    if (size == 0) return 0.0;
-                    int busy = 0;
-                    for (PooledInstance pi : instances) {
-                        if (pi.busy) busy++;
-                    }
-                    return (double) busy / size;
-                })
-                .strongReference(true)
-                .register(meterRegistry);
-
-        DistributionSummary requestSize = DistributionSummary.builder("pythonembed.serialization.size")
-                .tag("direction", "request")
-                .register(meterRegistry);
-        DistributionSummary responseSize = DistributionSummary.builder("pythonembed.serialization.size")
-                .tag("direction", "response")
-                .register(meterRegistry);
-
-        serializationSizeListener = new PythonProtocol.SerializationSizeListener() {
-            @Override public void onRequestSize(int bytes) { requestSize.record(bytes); }
-            @Override public void onResponseSize(int bytes) { responseSize.record(bytes); }
-        };
-    }
-
-    private void recordTimedSuccess(Timer.Sample sample, String timerName) {
-        if (sample != null) {
-            sample.stop(meterRegistry.timer(timerName, "error", "none"));
-        }
-    }
-
-    private void recordTimedError(Timer.Sample sample, String timerName, Throwable e) {
-        if (meterRegistry != null) {
-            String type = e.getClass().getSimpleName();
-            if (sample != null) {
-                sample.stop(meterRegistry.timer(timerName, "error", type));
-            }
-            meterRegistry.counter("pythonembed.call.errors", "type", type).increment();
-        }
     }
 
     // ------------------------------------------------------------------
@@ -311,15 +231,11 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<PythonValue> eval(String code) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
-                PythonValue result = pi.embed.eval(code);
-                recordTimedSuccess(sample, "pythonembed.eval.duration");
-                return result;
+                return pi.embed.eval(code);
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.eval.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -341,15 +257,11 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<PythonValue> eval(String code, long timeoutMs) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
-                PythonValue result = pi.embed.eval(code, timeoutMs);
-                recordTimedSuccess(sample, "pythonembed.eval.duration");
-                return result;
+                return pi.embed.eval(code, timeoutMs);
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.eval.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -370,15 +282,12 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<Void> exec(String code) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
                 pi.embed.exec(code);
-                recordTimedSuccess(sample, "pythonembed.exec.duration");
                 return null;
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.exec.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -400,15 +309,12 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<Void> exec(String code, long timeoutMs) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
                 pi.embed.exec(code, timeoutMs);
-                recordTimedSuccess(sample, "pythonembed.exec.duration");
                 return null;
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.exec.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -428,15 +334,11 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<List<PythonValue>> batchEval(List<String> codes) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
-                List<PythonValue> result = pi.embed.batchEval(codes);
-                recordTimedSuccess(sample, "pythonembed.eval.duration");
-                return result;
+                return pi.embed.batchEval(codes);
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.eval.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -459,15 +361,11 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<List<PythonValue>> batchEval(List<String> codes, long timeoutMs) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
-                List<PythonValue> result = pi.embed.batchEval(codes, timeoutMs);
-                recordTimedSuccess(sample, "pythonembed.eval.duration");
-                return result;
+                return pi.embed.batchEval(codes, timeoutMs);
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.eval.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -487,15 +385,12 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<Void> batchExec(List<String> codes) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
                 pi.embed.batchExec(codes);
-                recordTimedSuccess(sample, "pythonembed.exec.duration");
                 return null;
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.exec.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -518,15 +413,12 @@ public class PythonEmbedPool implements AutoCloseable {
     public CompletableFuture<Void> batchExec(List<String> codes, long timeoutMs) {
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            Timer.Sample sample = (meterRegistry != null) ? Timer.start(meterRegistry) : null;
             PooledInstance pi = null;
             try {
                 pi = acquireInstance();
                 pi.embed.batchExec(codes, timeoutMs);
-                recordTimedSuccess(sample, "pythonembed.exec.duration");
                 return null;
             } catch (PythonExecutionException | TimeoutException | IOException e) {
-                recordTimedError(sample, "pythonembed.exec.duration", e);
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -844,9 +736,6 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     private PythonEmbed createEmbed() throws IOException {
         PythonEmbed embed = PythonEmbed.create(options);
-        if (serializationSizeListener != null) {
-            embed.setSerializationSizeListener(serializationSizeListener);
-        }
         for (Map.Entry<String, CallbackHandler> e : callbackHandlers.entrySet()) {
             embed.registerCallback(e.getKey(), e.getValue());
         }
@@ -875,14 +764,6 @@ public class PythonEmbedPool implements AutoCloseable {
         ensureMinPool();
     }
 
-    /**
-     * Background task to create remaining instances up to minPool.
-     * Safe to call multiple times: ensureMinPool is a no-op once
-     * currentSize >= minPool.
-     */
-    private void preWarmRemaining() {
-        ensureMinPool();
-    }
 
     /**
      * Periodically removes idle instances above minPool.

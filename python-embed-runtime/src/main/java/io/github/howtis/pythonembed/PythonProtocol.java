@@ -136,21 +136,6 @@ abstract class PythonProtocol {
     }
 
     /**
-     * Listener for serialization size measurements, used to feed
-     * {@code pythonembed.serialization.size} distribution summaries.
-     */
-    public interface SerializationSizeListener {
-        void onRequestSize(int bytes);
-        void onResponseSize(int bytes);
-    }
-
-    SerializationSizeListener serializationSizeListener;
-
-    void setSerializationSizeListener(SerializationSizeListener listener) {
-        this.serializationSizeListener = listener;
-    }
-
-    /**
      * Registers a pending request and returns a future that completes when the response arrives.
      */
     CompletableFuture<Response> registerRequest(int id) {

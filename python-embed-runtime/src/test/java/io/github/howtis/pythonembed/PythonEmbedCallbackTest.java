@@ -20,7 +20,7 @@ class PythonEmbedCallbackTest {
 
     @BeforeAll
     static void setUp() throws Exception {
-        py = PythonEmbed.builder().build();
+        py = PythonEmbed.create(PythonEmbed.Options.defaults());
     }
 
     @AfterAll

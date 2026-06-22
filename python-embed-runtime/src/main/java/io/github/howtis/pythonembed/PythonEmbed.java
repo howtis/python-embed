@@ -38,29 +38,25 @@ import java.util.logging.Logger;
  * </ol>
  *
  * <pre>{@code
- * // Default usage -- self-builder:
- * try (PythonEmbed py = PythonEmbed.builder().build()) {
+ * // Defaults:
+ * try (PythonEmbed py = PythonEmbed.create(Options.defaults())) {
  *     int result = py.eval("sum([1, 2, 3])").asInt();
  *     py.exec("x = 42");
  * }
  *
  * // With explicit venv path:
- * try (PythonEmbed py = PythonEmbed.builder()
- *         .venvPath(Path.of("/opt/myapp/venv")).build()) {
+ * try (PythonEmbed py = PythonEmbed.create(
+ *         Options.builder()
+ *                 .venvPath(Path.of("/opt/myapp/venv")).build())) {
  *     py.exec("import numpy as np");
  * }
  *
  * // With GPU support:
- * try (PythonEmbed py = PythonEmbed.builder()
- *         .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
- *         .build()) {
+ * try (PythonEmbed py = PythonEmbed.create(
+ *         Options.builder()
+ *                 .env(Map.of("CUDA_VISIBLE_DEVICES", "0")).build())) {
  *     py.exec("import torch; print(torch.cuda.is_available())");
  * }
- *
- * // Or via Options (same result, useful when passing config around):
- * PythonEmbed.Options opts = PythonEmbed.Options.builder()
- *         .venvPath(Path.of("/opt/myapp/venv")).build();
- * try (PythonEmbed py = PythonEmbed.create(opts)) { ... }
  * }</pre>
  */
 public class PythonEmbed implements AutoCloseable {
@@ -96,10 +92,6 @@ public class PythonEmbed implements AutoCloseable {
         this.explicitVenvPath = options.venvPath();
     }
 
-    void setSerializationSizeListener(PythonProtocol.SerializationSizeListener listener) {
-        protocol.setSerializationSizeListener(listener);
-    }
-
     /**
      * Creates a new PythonEmbed instance with the given options.
      *
@@ -130,32 +122,6 @@ public class PythonEmbed implements AutoCloseable {
         PythonEmbed embed = new PythonEmbed(options);
         embed.initialize();
         return embed;
-    }
-
-    /**
-     * Returns a new {@link Builder} for constructing a {@link PythonEmbed}
-     * without going through {@link Options}.
-     *
-     * <pre>{@code
-     * // Simple default instance:
-     * PythonEmbed py = PythonEmbed.builder().build();
-     *
-     * // With explicit venv:
-     * PythonEmbed py = PythonEmbed.builder()
-     *         .venvPath(Path.of("/opt/venv"))
-     *         .build();
-     *
-     * // With GPU support:
-     * PythonEmbed py = PythonEmbed.builder()
-     *         .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
-     *         .timeoutMs(60_000)
-     *         .build();
-     * }</pre>
-     *
-     * @return a new Builder with default values
-     */
-    public static Builder builder() {
-        return new Builder();
     }
 
     private void initialize() throws IOException {
@@ -861,15 +827,16 @@ public class PythonEmbed implements AutoCloseable {
     /**
      * Configuration options for PythonEmbed.
      *
-     * <p>For quick one-off construction, prefer {@link PythonEmbed#builder()}:
+     * <p>Use {@link PythonEmbed#create(Options)} with this builder:
      * <pre>{@code
-     * try (PythonEmbed py = PythonEmbed.builder()
-     *         .timeoutMs(60_000)
-     *         .venvPath(Path.of("/opt/venv"))
-     *         .build()) { ... }
+     * try (PythonEmbed py = PythonEmbed.create(
+     *         Options.builder()
+     *                 .timeoutMs(60_000)
+     *                 .venvPath(Path.of("/opt/venv"))
+     *                 .build())) { ... }
      * }</pre>
      *
-     * <p>Use Options when you need to pass configuration around:
+     * <p>Or pass Options around separately:
      * <pre>{@code
      * Options opts = Options.builder()
      *         .timeoutMs(60_000)
@@ -1020,103 +987,6 @@ public class PythonEmbed implements AutoCloseable {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Builder
-    // ------------------------------------------------------------------
-
-    /**
-     * A builder for {@link PythonEmbed} that mirrors all configuration
-     * options directly, without requiring an intermediate {@link Options}
-     * object.
-     *
-     * <p>All fields default to the same values as {@link Options#defaults()}.
-     * Call {@link #build()} to create and initialize a new instance.
-     *
-     * <p>For pool usage, construct an {@link Options} separately via
-     * {@link Options#builder()} and pass to
-     * {@link PythonEmbedPool.Builder#options(Options)}.
-     */
-    public static final class Builder {
-        private long timeoutMs = 30_000;
-        private int maxCodeLength = 100_000;
-        private long startupTimeoutMs = 30_000;
-        private String pythonExecutable = null;
-        private final List<String> warmupScripts = new ArrayList<>();
-        private boolean lenientWarmup = true;
-        private Path venvPath = null;
-        private Map<String, String> env = Collections.emptyMap();
-
-        /** Set per-request timeout in milliseconds (default: 30_000). */
-        public Builder timeoutMs(long value) {
-            this.timeoutMs = value;
-            return this;
-        }
-
-        /** Set maximum code length in characters (default: 100_000). */
-        public Builder maxCodeLength(int value) {
-            this.maxCodeLength = value;
-            return this;
-        }
-
-        /** Set startup timeout in milliseconds (default: 30_000). */
-        public Builder startupTimeoutMs(long value) {
-            this.startupTimeoutMs = value;
-            return this;
-        }
-
-        /** Override the Python executable path (null for auto-detect). */
-        public Builder pythonExecutable(String value) {
-            this.pythonExecutable = value;
-            return this;
-        }
-
-        /** Append a warmup script to execute after instance initialization. */
-        public Builder warmupScript(String script) {
-            this.warmupScripts.add(script);
-            return this;
-        }
-
-        /** Append multiple warmup scripts at once. */
-        public Builder warmupScripts(List<String> scripts) {
-            this.warmupScripts.addAll(scripts);
-            return this;
-        }
-
-        /**
-         * Set whether warmup script failures should be logged as warnings
-         * instead of throwing exceptions. Default is {@code true}.
-         */
-        public Builder lenientWarmup(boolean value) {
-            this.lenientWarmup = value;
-            return this;
-        }
-
-        /** Set the explicit venv path (null for auto-discovery). */
-        public Builder venvPath(Path value) {
-            this.venvPath = value;
-            return this;
-        }
-
-        /** Set environment variables for the Python process. */
-        public Builder env(Map<String, String> value) {
-            this.env = value;
-            return this;
-        }
-
-        /**
-         * Builds and initializes a new {@link PythonEmbed} instance.
-         *
-         * @return a ready-to-use PythonEmbed instance
-         * @throws IOException if venv extraction or process startup fails
-         */
-        public PythonEmbed build() throws IOException {
-            Options opts = new Options(timeoutMs,
-                    maxCodeLength, startupTimeoutMs, pythonExecutable,
-                    List.copyOf(warmupScripts), lenientWarmup,
-                    venvPath, env);
-            return create(opts);
-        }
-    }
 
     private Path extractBridge() throws IOException {
         Path bridgeFile = Files.createTempFile("python-embed-bridge-", ".py");

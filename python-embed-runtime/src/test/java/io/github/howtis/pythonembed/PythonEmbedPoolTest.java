@@ -1,14 +1,9 @@
 package io.github.howtis.pythonembed;
 
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -1245,112 +1240,6 @@ class PythonEmbedPoolTest {
         ExecutionException ex = assertThrows(ExecutionException.class,
                 () -> future.get(5, TimeUnit.SECONDS));
         assertTrue(ex.getCause().getMessage().contains("NameError"));
-    }
-
-    // ------------------------------------------------------------------
-    // Metrics tests
-    // ------------------------------------------------------------------
-
-    @Nested
-    class MetricsTest {
-        private SimpleMeterRegistry meterRegistry;
-        private PythonEmbedPool metricsPool;
-
-        @BeforeEach
-        void setUp() throws IOException {
-            meterRegistry = new SimpleMeterRegistry();
-            metricsPool = PythonEmbedPool.builder().minPool(1).maxPool(1).meterRegistry(meterRegistry).build();
-        }
-
-        @AfterEach
-        void tearDown() {
-            metricsPool.close();
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void poolSize_gauge_reflectsCurrentSize() {
-            assertEquals(1.0, meterRegistry.get("pythonembed.pool.size").gauge().value(), 0.01);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void poolActive_gauge_startsAtZero() {
-            assertEquals(0.0, meterRegistry.get("pythonembed.pool.active").gauge().value(), 0.01);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void poolUtilization_gauge_startsAtZero() {
-            assertEquals(0.0, meterRegistry.get("pythonembed.pool.utilization").gauge().value(), 0.01);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void evalDuration_timer_recordsCall() throws Exception {
-            metricsPool.eval("42").get(5, TimeUnit.SECONDS);
-            Timer timer = meterRegistry.find("pythonembed.eval.duration")
-                    .tag("error", "none").timer();
-            assertNotNull(timer);
-            assertTrue(timer.count() > 0);
-            assertTrue(timer.totalTime(TimeUnit.NANOSECONDS) > 0);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void execDuration_timer_recordsCall() throws Exception {
-            metricsPool.exec("x = 1").get(5, TimeUnit.SECONDS);
-            Timer timer = meterRegistry.find("pythonembed.exec.duration")
-                    .tag("error", "none").timer();
-            assertNotNull(timer);
-            assertTrue(timer.count() > 0);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void evalDuration_timer_tagsErrorOnFailure() {
-            CompletableFuture<PythonValue> future = metricsPool.eval("raise Exception('test_error')");
-            assertThrows(ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS));
-            Timer timer = meterRegistry.find("pythonembed.eval.duration")
-                    .tag("error", "PythonExecutionException").timer();
-            assertNotNull(timer);
-            assertTrue(timer.count() > 0);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void callErrors_counter_incrementsOnError() {
-            CompletableFuture<PythonValue> future = metricsPool.eval("raise ValueError('boom')");
-            assertThrows(ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS));
-            assertTrue(meterRegistry.find("pythonembed.call.errors")
-                    .tag("type", "PythonExecutionException").counter().count() > 0);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void serializationSize_summary_recordsAfterEval() throws Exception {
-            metricsPool.eval("42").get(5, TimeUnit.SECONDS);
-            DistributionSummary requestSummary = meterRegistry
-                    .find("pythonembed.serialization.size")
-                    .tag("direction", "request").summary();
-            assertNotNull(requestSummary);
-            assertTrue(requestSummary.count() > 0);
-            DistributionSummary responseSummary = meterRegistry
-                    .find("pythonembed.serialization.size")
-                    .tag("direction", "response").summary();
-            assertNotNull(responseSummary);
-            assertTrue(responseSummary.count() > 0);
-        }
-
-        @Test
-        @Timeout(value = 10, unit = TimeUnit.SECONDS)
-        void noopWithoutMeterRegistry_worksCorrectly() throws Exception {
-            try (PythonEmbedPool noopPool = PythonEmbedPool.builder().maxPool(1).build()) {
-                PythonValue result = noopPool.eval("42").get(5, TimeUnit.SECONDS);
-                assertEquals(42, result.asInt());
-                noopPool.exec("x = 7").get(5, TimeUnit.SECONDS);
-            }
-        }
     }
 
     // ---- PythonEmbed.arg() via pool ----
