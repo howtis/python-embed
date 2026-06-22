@@ -31,6 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PythonEmbedPoolTest {
 
+    interface Calculator {
+        int add(int a, int b);
+        int subtract(int a, int b);
+    }
+
     private static PythonEmbedPool pool;
 
     @BeforeAll
@@ -1242,6 +1247,27 @@ class PythonEmbedPoolTest {
         ExecutionException ex = assertThrows(ExecutionException.class,
                 () -> future.get(5, TimeUnit.SECONDS));
         assertTrue(ex.getCause().getMessage().contains("NameError"));
+    }
+
+    // ---- proxy shortcut ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void proxy_shortcut_wrapsVariableInSingleCall() throws Exception {
+        // Set up class and variable on all instances
+        for (int i = 0; i < pool.size(); i++) {
+            pool.exec("""
+                    class Calc:
+                        def add(self, a, b):
+                            return a + b
+                        def subtract(self, a, b):
+                            return a - b
+                    calc = Calc()
+                    """).get(3, TimeUnit.SECONDS);
+        }
+        Calculator calc = pool.proxy("calc", Calculator.class);
+        assertEquals(7, calc.add(3, 4));
+        assertEquals(-1, calc.subtract(3, 4));
     }
 
     // ---- PythonEmbed.arg() via pool ----

@@ -555,6 +555,31 @@ public class PythonEmbedPool implements AutoCloseable {
     }
 
     /**
+     * Shortcut that wraps a Python variable as a Java interface proxy
+     * in a single call.
+     *
+     * <p>Equivalent to {@code proxy(ref(name).join().refId(), interfaceClass)}.
+     *
+     * <pre>{@code
+     * pool.exec("class Calc:\n    def add(self, a, b): return a + b\ncalc = Calc()");
+     * Calculator c = pool.proxy("calc", Calculator.class);
+     * int result = c.add(3, 4);  // 7
+     * }</pre>
+     *
+     * @param <T>            the interface type
+     * @param variableName   the Python variable name in the global scope
+     * @param interfaceClass the Java interface to proxy
+     * @return a dynamic proxy implementing the given interface
+     * @throws PythonExecutionException if ref resolution fails
+     * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T proxy(String variableName, Class<T> interfaceClass) {
+        PythonHandle handle = ref(variableName).join();
+        return proxy(handle.refId(), interfaceClass);
+    }
+
+    /**
      * Registers a callback handler on all current and future instances.
      * When the pool scales up, new instances automatically receive
      * all previously registered handlers.
