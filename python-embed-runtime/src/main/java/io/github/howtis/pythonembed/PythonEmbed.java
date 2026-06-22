@@ -3,6 +3,7 @@ package io.github.howtis.pythonembed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.Iterator;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -704,6 +705,157 @@ public class PythonEmbed implements AutoCloseable {
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error cleaning up venv", e);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Safe parameter injection
+    // ------------------------------------------------------------------
+
+    private static final int ARG_MAX_DEPTH = 20;
+    private static final int ARG_MAX_COLLECTION_SIZE = 1000;
+
+    /**
+     * Converts a Java value to a safe Python literal string
+     * for use in eval/exec code strings.
+     *
+     * <p>This eliminates the risk of Python code injection when
+     * values from external sources (user input, databases, etc.)
+     * are interpolated into Python code via string concatenation.
+     *
+     * <pre>{@code
+     * // Safe:
+     * py.eval("len(" + PythonEmbed.arg(userInput) + ")");
+     *
+     * // Type examples:
+     * PythonEmbed.arg(null)        -&gt; None
+     * PythonEmbed.arg("hello")     -&gt; 'hello'
+     * PythonEmbed.arg(42)          -&gt; 42
+     * PythonEmbed.arg(true)        -&gt; True
+     * PythonEmbed.arg(List.of(1, 2)) -&gt; [1, 2]
+     * PythonEmbed.arg(Map.of("k", 1)) -&gt; {'k': 1}
+     * }</pre>
+     *
+     * @param value the Java value to convert (null allowed)
+     * @return a Python literal expression as a String
+     * @throws IllegalArgumentException if nesting depth exceeds 20
+     *         or collection/map size exceeds 1000
+     */
+    public static String arg(Object value) {
+        return arg(value, 0);
+    }
+
+    private static String arg(Object value, int depth) {
+        if (depth > ARG_MAX_DEPTH) {
+            throw new IllegalArgumentException(
+                    "PythonEmbed.arg() nesting depth exceeds limit of " + ARG_MAX_DEPTH);
+        }
+        if (value == null) {
+            return "None";
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value ? "True" : "False";
+        }
+        if (value instanceof Integer || value instanceof Long
+                || value instanceof Short || value instanceof Byte) {
+            return value.toString();
+        }
+        if (value instanceof Double) {
+            double d = (Double) value;
+            if (Double.isNaN(d)) {
+                return "float('nan')";
+            }
+            if (Double.isInfinite(d)) {
+                return d > 0 ? "float('inf')" : "float('-inf')";
+            }
+            return value.toString();
+        }
+        if (value instanceof Float) {
+            float f = (Float) value;
+            if (Float.isNaN(f)) {
+                return "float('nan')";
+            }
+            if (Float.isInfinite(f)) {
+                return f > 0 ? "float('inf')" : "float('-inf')";
+            }
+            return value.toString();
+        }
+        if (value instanceof String) {
+            return "'" + escapePythonString((String) value) + "'";
+        }
+        if (value instanceof Collection<?> coll) {
+            if (coll.size() > ARG_MAX_COLLECTION_SIZE) {
+                throw new IllegalArgumentException(
+                        "PythonEmbed.arg() collection size " + coll.size()
+                                + " exceeds limit of " + ARG_MAX_COLLECTION_SIZE);
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Object elem : coll) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                sb.append(arg(elem, depth + 1));
+                first = false;
+            }
+            sb.append(']');
+            return sb.toString();
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (map.size() > ARG_MAX_COLLECTION_SIZE) {
+                throw new IllegalArgumentException(
+                        "PythonEmbed.arg() map size " + map.size()
+                                + " exceeds limit of " + ARG_MAX_COLLECTION_SIZE);
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append('{');
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                sb.append(arg(entry.getKey(), depth + 1));
+                sb.append(": ");
+                sb.append(arg(entry.getValue(), depth + 1));
+                first = false;
+            }
+            sb.append('}');
+            return sb.toString();
+        }
+        // Fallback: unrecognized type -&gt; escape toString()
+        return "'" + escapePythonString(value.toString()) + "'";
+    }
+
+    private static String escapePythonString(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\'':
+                    sb.append("\\'");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20 || c == 0x7f) {
+                        sb.append("\\x");
+                        sb.append(String.format("%02x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 
     /**

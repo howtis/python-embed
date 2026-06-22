@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -730,5 +731,122 @@ class PythonEmbedIntegrationTest {
                         .venvPath(Path.of("build", "python-venv"))
                         .build()
         );
+    }
+
+    // ---- PythonEmbed.arg() integration tests ----
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_safeStringLen() throws Exception {
+        PythonValue result = py.eval("len(" + PythonEmbed.arg("safe") + ")");
+        assertEquals(4, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_safeIntEval() throws Exception {
+        PythonValue result = py.eval("[" + PythonEmbed.arg(10) + ", " + PythonEmbed.arg(20) + "]");
+        List<Double> list = result.asList(Double.class);
+        assertEquals(List.of(10.0, 20.0), list);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_listViaExec() throws Exception {
+        py.exec("x = " + PythonEmbed.arg(List.of(1, 2, 3)));
+        PythonValue result = py.eval("x");
+        List<Double> list = result.asList(Double.class);
+        assertEquals(List.of(1.0, 2.0, 3.0), list);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_mapViaExec() throws Exception {
+        py.exec("d = " + PythonEmbed.arg(Map.of("name", "test", "count", 42)));
+        PythonValue name = py.eval("d['name']");
+        assertEquals("test", name.asString());
+        PythonValue count = py.eval("d['count']");
+        assertEquals(42, count.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_sqlInjection_blocked() throws Exception {
+        // Classic SQL injection pattern should be treated as data, not code
+        String malicious = "'; import os; os.system('echo hacked') #";
+        String code = "len(" + PythonEmbed.arg(malicious) + ")";
+        // arg() escapes quotes so the entire payload is a string literal.
+        // len() returns the string length -- no code execution occurs.
+        PythonValue result = py.eval(code);
+        assertTrue(result.asInt() > 0, "Expected positive length, got: " + result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_pythonInjection_blocked() throws Exception {
+        // Python-specific injection: breaking out of a string context
+        String malicious = "'); import os; os.system('echo pwned') #";
+        String code = "len(" + PythonEmbed.arg(malicious) + ")";
+        // arg() escapes the single quotes, so the string is safe
+        PythonValue result = py.eval(code);
+        // len() of the escaped string -- no code execution
+        assertTrue(result.asInt() > 0, "Expected length > 0 for escaped string");
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_stringWithSpecialChars_roundtrip() throws Exception {
+        String input = "line1\nline2\tindented\\path'quote";
+        py.exec("s = " + PythonEmbed.arg(input));
+        PythonValue result = py.eval("s");
+        assertEquals(input, result.asString());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_emptyString() throws Exception {
+        PythonValue result = py.eval(PythonEmbed.arg(""));
+        assertEquals("", result.asString());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_noneValue() throws Exception {
+        py.exec("v = " + PythonEmbed.arg(null));
+        PythonValue result = py.eval("v is None");
+        assertTrue(result.asBoolean());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_boolValues() throws Exception {
+        py.exec("t = " + PythonEmbed.arg(true));
+        py.exec("f = " + PythonEmbed.arg(false));
+        assertTrue(py.eval("t").asBoolean());
+        assertFalse(py.eval("f").asBoolean());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_doubleSpecialValues() throws Exception {
+        py.exec("nan = " + PythonEmbed.arg(Double.NaN));
+        py.exec("inf = " + PythonEmbed.arg(Double.POSITIVE_INFINITY));
+        py.exec("ninf = " + PythonEmbed.arg(Double.NEGATIVE_INFINITY));
+        py.exec("import math");
+        // Verify the values are recognized as special floats in Python
+        assertTrue(py.eval("math.isnan(nan)").asBoolean());
+        assertTrue(py.eval("inf == float('inf')").asBoolean());
+        assertTrue(py.eval("ninf == float('-inf')").asBoolean());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void arg_nestedCollections() throws Exception {
+        py.exec("data = " + PythonEmbed.arg(
+                List.of(Map.of("name", "alice", "scores", List.of(90, 85, 95)))));
+        PythonValue name = py.eval("data[0]['name']");
+        assertEquals("alice", name.asString());
+        PythonValue secondScore = py.eval("data[0]['scores'][1]");
+        assertEquals(85.0, secondScore.asDouble(), 0.001);
     }
 }

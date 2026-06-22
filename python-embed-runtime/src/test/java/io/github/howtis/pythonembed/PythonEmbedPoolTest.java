@@ -1353,6 +1353,38 @@ class PythonEmbedPoolTest {
         }
     }
 
+    // ---- PythonEmbed.arg() via pool ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void arg_viaPool_safeString() throws Exception {
+        PythonValue result = pool.eval("len(" + PythonEmbed.arg("safe") + ")")
+                .get(3, TimeUnit.SECONDS);
+        assertEquals(4, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void arg_viaPool_listAndMap() throws Exception {
+        pool.exec("data = " + PythonEmbed.arg(
+                List.of(Map.of("k", "v"), 42)))
+                .get(3, TimeUnit.SECONDS);
+        // Multiple execs to cover all pool instances (round-robin)
+        pool.exec("data = " + PythonEmbed.arg(
+                List.of(Map.of("k", "v"), 42)))
+                .get(3, TimeUnit.SECONDS);
+        pool.exec("data = " + PythonEmbed.arg(
+                List.of(Map.of("k", "v"), 42)))
+                .get(3, TimeUnit.SECONDS);
+        pool.exec("data = " + PythonEmbed.arg(
+                List.of(Map.of("k", "v"), 42)))
+                .get(3, TimeUnit.SECONDS);
+        PythonValue item = pool.eval("data[0]['k']").get(3, TimeUnit.SECONDS);
+        assertEquals("v", item.asString());
+        PythonValue num = pool.eval("data[1]").get(3, TimeUnit.SECONDS);
+        assertEquals(42.0, num.asDouble(), 0.001);
+    }
+
     /**
      * Waits for the pool to reach the given size, polling every 100ms.
      */
