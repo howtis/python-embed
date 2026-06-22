@@ -4,6 +4,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 /**
  * {@link InvocationHandler} that routes Java interface method calls to a
@@ -20,6 +22,12 @@ class PythonProxy implements InvocationHandler {
     private final int refId;
     private final long timeoutMs;
     private final PythonHandle handle; // strong reference to keep Python object alive
+
+    static final ConcurrentHashMap<Method, ResolutionStrategy> RESOLUTION_CACHE = new ConcurrentHashMap<>();
+
+    static void clearResolutionCache() {
+        RESOLUTION_CACHE.clear();
+    }
 
     /**
      * Creates a handler that wraps a Python object identified by {@code refId}.
@@ -55,41 +63,66 @@ class PythonProxy implements InvocationHandler {
      */
     Object invokePython(Method method, Object[] args) throws Throwable {
         String javaName = method.getName();
+        String snakeName = camelToSnake(javaName);
         Object[] callArgs = (args != null && args.length > 0) ? args : new Object[0];
 
-        // 1. Try calling as a method (handles both zero-arg and multi-arg)
+        // 1. Check cache -- skip resolution if strategy already known
+        ResolutionStrategy cached = RESOLUTION_CACHE.get(method);
+        if (cached != null) {
+            try {
+                return executeStrategy(cached, method, javaName, snakeName, args);
+            } catch (PythonExecutionException e) {
+                // Cached strategy failed -- fall through to full resolution
+            }
+        }
+
+        // 2. Try calling as a method (handles both zero-arg and multi-arg)
         try {
-            return convertResult(
-                    protocol.sendCall(writer, refId, javaName, callArgs),
-                    method.getReturnType());
+            PythonValue result = protocol.sendCall(writer, refId, javaName, callArgs);
+            RESOLUTION_CACHE.put(method, ResolutionStrategy.CALL_CAMEL);
+            return convertResult(result, method.getReturnType());
         } catch (PythonExecutionException e) {
-            // 2. If AttributeError and name differs, try snake_case call
-            String snakeName = camelToSnake(javaName);
+            // 3. If AttributeError and name differs, try snake_case call
             if (isAttributeError(e) && !snakeName.equals(javaName)) {
                 try {
-                    return convertResult(
-                            protocol.sendCall(writer, refId, snakeName, callArgs),
-                            method.getReturnType());
+                    PythonValue result = protocol.sendCall(writer, refId, snakeName, callArgs);
+                    RESOLUTION_CACHE.put(method, ResolutionStrategy.CALL_SNAKE);
+                    return convertResult(result, method.getReturnType());
                 } catch (PythonExecutionException e2) {
                     // call failed with snake_case too - try getattr as last resort
                     // (it might be a property, not a method)
                     if (isAttributeError(e2) && callArgs.length == 0) {
-                        return convertResult(
-                                protocol.sendGetAttr(writer, refId, snakeName),
-                                method.getReturnType());
+                        PythonValue result = protocol.sendGetAttr(writer, refId, snakeName);
+                        RESOLUTION_CACHE.put(method, ResolutionStrategy.GETATTR_SNAKE);
+                        return convertResult(result, method.getReturnType());
                     }
                     throw e2;
                 }
             }
-            // 3. Exact-name call failed - try getattr as fallback
+            // 4. Exact-name call failed - try getattr as fallback
             //    (the attribute might be a property, not a callable)
             if (isAttributeError(e) && callArgs.length == 0) {
-                return convertResult(
-                        protocol.sendGetAttr(writer, refId, javaName),
-                        method.getReturnType());
+                PythonValue result = protocol.sendGetAttr(writer, refId, javaName);
+                RESOLUTION_CACHE.put(method, ResolutionStrategy.GETATTR_CAMEL);
+                return convertResult(result, method.getReturnType());
             }
             throw e;
         }
+    }
+
+    // ---- strategy execution ----
+
+    private Object executeStrategy(ResolutionStrategy strategy, Method method,
+                                    String javaName, String snakeName, Object[] args)
+            throws PythonExecutionException, TimeoutException, java.io.IOException {
+        Object[] callArgs = (args != null && args.length > 0) ? args : new Object[0];
+        PythonValue result = switch (strategy) {
+            case CALL_CAMEL -> protocol.sendCall(writer, refId, javaName, callArgs);
+            case CALL_SNAKE -> protocol.sendCall(writer, refId, snakeName, callArgs);
+            case GETATTR_CAMEL -> protocol.sendGetAttr(writer, refId, javaName);
+            case GETATTR_SNAKE -> protocol.sendGetAttr(writer, refId, snakeName);
+        };
+        return convertResult(result, method.getReturnType());
     }
 
     // ---- type conversion ----
@@ -160,5 +193,14 @@ class PythonProxy implements InvocationHandler {
     static boolean isAttributeError(PythonExecutionException e) {
         String msg = e.getMessage();
         return msg != null && msg.contains("AttributeError");
+    }
+
+    // ---- resolution strategy ----
+
+    enum ResolutionStrategy {
+        CALL_CAMEL,
+        CALL_SNAKE,
+        GETATTR_CAMEL,
+        GETATTR_SNAKE
     }
 }

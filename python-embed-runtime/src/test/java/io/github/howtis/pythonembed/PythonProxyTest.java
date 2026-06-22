@@ -1,5 +1,6 @@
 package io.github.howtis.pythonembed;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -90,6 +91,11 @@ class PythonProxyTest {
 
     private static final PythonExecutionException VALUE_ERROR =
             new PythonExecutionException("invalid value: ValueError: bad input");
+
+    @BeforeEach
+    void setUp() {
+        PythonProxy.clearResolutionCache();
+    }
 
     // ==================================================================
     // camelToSnake
@@ -342,5 +348,131 @@ class PythonProxyTest {
 
         assertNull(result);
         assertEquals(1, proto.callCount);
+    }
+
+    // ==================================================================
+    // resolution caching
+    // ==================================================================
+
+    @Test
+    void caching_directCall_cacheHit() throws Throwable {
+        Method method = Calc.class.getDeclaredMethod("calculateSum", int.class, int.class);
+
+        // First call resolves via CALL_CAMEL and caches it
+        StubProtocol proto1 = new StubProtocol();
+        proto1.callResult = PythonValue.of(42);
+        PythonProxy handler1 = new PythonProxy(proto1, NOOP_WRITER, 7, 1000);
+        Object result1 = handler1.invokePython(method, new Object[]{3, 4});
+        assertEquals(42, result1);
+        assertEquals(1, proto1.callCount);
+
+        // Second call with fresh protocol -- cache hit, uses CALL_CAMEL directly
+        StubProtocol proto2 = new StubProtocol();
+        proto2.callResult = PythonValue.of(99);
+        PythonProxy handler2 = new PythonProxy(proto2, NOOP_WRITER, 7, 1000);
+        Object result2 = handler2.invokePython(method, new Object[]{5, 6});
+        assertEquals(99, result2);
+        assertEquals(1, proto2.callCount);
+        assertEquals("calculateSum", proto2.lastCallMethod);
+    }
+
+    @Test
+    void caching_snakeCase_cacheHit() throws Throwable {
+        Method method = Calc.class.getDeclaredMethod("calculateSum", int.class, int.class);
+
+        // First call: CALL_CAMEL fails, CALL_SNAKE succeeds -- caches CALL_SNAKE
+        StubProtocol proto1 = new StubProtocol();
+        proto1.callError = ATTR_ERROR;
+        proto1.snakeCallResult = PythonValue.of(15);
+        PythonProxy handler1 = new PythonProxy(proto1, NOOP_WRITER, 7, 1000);
+        Object result1 = handler1.invokePython(method, new Object[]{3, 4});
+        assertEquals(15, result1);
+        assertEquals(2, proto1.callCount);
+
+        // Second call with fresh protocol: cache hit, 1 sendCall with snake_case name
+        StubProtocol proto2 = new StubProtocol();
+        proto2.callResult = PythonValue.of(30);
+        PythonProxy handler2 = new PythonProxy(proto2, NOOP_WRITER, 7, 1000);
+        Object result2 = handler2.invokePython(method, new Object[]{5, 6});
+        assertEquals(30, result2);
+        assertEquals(1, proto2.callCount);
+        assertEquals("calculate_sum", proto2.lastCallMethod);
+    }
+
+    @Test
+    void caching_getter_cacheHit() throws Throwable {
+        Method method = Getter.class.getDeclaredMethod("getValue");
+
+        // First call: CALL_CAMEL fails, CALL_SNAKE fails, GETATTR_SNAKE succeeds
+        StubProtocol proto1 = new StubProtocol();
+        proto1.callError = ATTR_ERROR;
+        proto1.snakeCallError = ATTR_ERROR;
+        proto1.getAttrResult = PythonValue.of(99);
+        PythonProxy handler1 = new PythonProxy(proto1, NOOP_WRITER, 7, 1000);
+        Object result1 = handler1.invokePython(method, new Object[0]);
+        assertEquals(99, result1);
+
+        // Second call with fresh protocol: cache hit, 1 sendGetAttr with snake_case name
+        StubProtocol proto2 = new StubProtocol();
+        proto2.getAttrResult = PythonValue.of(77);
+        PythonProxy handler2 = new PythonProxy(proto2, NOOP_WRITER, 7, 1000);
+        Object result2 = handler2.invokePython(method, new Object[0]);
+        assertEquals(77, result2);
+        assertEquals(0, proto2.callCount);
+        assertEquals(1, proto2.getAttrCount);
+        assertEquals("get_value", proto2.lastGetAttrName);
+    }
+
+    @Test
+    void caching_wrongStrategy_fallsBackAndUpdatesCache() throws Throwable {
+        Method method = Calc.class.getDeclaredMethod("calculateSum", int.class, int.class);
+
+        // Pre-populate cache with CALL_CAMEL -- will throw AttributeError on first use
+        PythonProxy.RESOLUTION_CACHE.put(method, PythonProxy.ResolutionStrategy.CALL_CAMEL);
+
+        // Cache hit fails, falls through to full resolution, which succeeds
+        StubProtocol proto1 = new StubProtocol();
+        proto1.callError = ATTR_ERROR;
+        proto1.snakeCallResult = PythonValue.of(42);
+        PythonProxy handler1 = new PythonProxy(proto1, NOOP_WRITER, 7, 1000);
+        Object result1 = handler1.invokePython(method, new Object[]{3, 4});
+        assertEquals(42, result1);
+
+        // Second call with fresh protocol: cache should have been updated by fallback
+        StubProtocol proto2 = new StubProtocol();
+        proto2.callResult = PythonValue.of(99);
+        PythonProxy handler2 = new PythonProxy(proto2, NOOP_WRITER, 7, 1000);
+        Object result2 = handler2.invokePython(method, new Object[]{5, 6});
+        assertEquals(99, result2);
+        assertEquals(1, proto2.callCount);
+    }
+
+    @Test
+    void caching_differentMethods_independentCacheEntries() throws Throwable {
+        Method getValueMethod = Getter.class.getDeclaredMethod("getValue");
+        Method valueMethod = Getter.class.getDeclaredMethod("value");
+
+        // getValue resolves via GETATTR_SNAKE
+        StubProtocol proto1 = new StubProtocol();
+        proto1.callError = ATTR_ERROR;
+        proto1.snakeCallError = ATTR_ERROR;
+        proto1.getAttrResult = PythonValue.of(99);
+        PythonProxy handler1 = new PythonProxy(proto1, NOOP_WRITER, 7, 1000);
+        handler1.invokePython(getValueMethod, new Object[0]);
+        assertEquals(PythonProxy.ResolutionStrategy.GETATTR_SNAKE,
+                PythonProxy.RESOLUTION_CACHE.get(getValueMethod));
+
+        // value resolves via GETATTR_CAMEL (different cache entry)
+        StubProtocol proto2 = new StubProtocol();
+        proto2.callError = ATTR_ERROR;
+        proto2.getAttrResult = PythonValue.of(7);
+        PythonProxy handler2 = new PythonProxy(proto2, NOOP_WRITER, 7, 1000);
+        handler2.invokePython(valueMethod, new Object[0]);
+        assertEquals(PythonProxy.ResolutionStrategy.GETATTR_CAMEL,
+                PythonProxy.RESOLUTION_CACHE.get(valueMethod));
+
+        // getValue still has its own cache entry
+        assertEquals(PythonProxy.ResolutionStrategy.GETATTR_SNAKE,
+                PythonProxy.RESOLUTION_CACHE.get(getValueMethod));
     }
 }
