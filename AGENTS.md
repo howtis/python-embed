@@ -8,10 +8,8 @@ This project uses an Obsidian vault (`agent-memory`) for cross-session memory.
 On session start, read the project context and preferences:
 
 ```bash
+obsidian vault="agent-memory" read path="Projects/preferences.md"
 obsidian vault="agent-memory" read path="Projects/python-embed.md"
-obsidian vault="agent-memory" read path="Preferences/general.md"
-obsidian vault="agent-memory" read path="Preferences/coding-style.md"
-obsidian vault="agent-memory" read path="Preferences/workflow.md"
 ```
 
 ### During Session
@@ -19,11 +17,11 @@ obsidian vault="agent-memory" read path="Preferences/workflow.md"
 - All documentation must be managed within Obsidian. Do not leave any documentation within the project.
 
 - **Decision made** → create `Decisions/{title}.md`
-- **Task completed/created** → update `Tasks/active.md`
+- **Task completed/created** → update `Tasks/active.md`, `Tasks/completed.md`
 
 ### Session End
 
-- Update `Tasks/active.md` and `Decisions/{title}.md`
+- Update `Tasks/active.md`, `Tasks/completed.md` and `Decisions/{title}.md`
 - Rebuild `_Index.md` if many notes were added
 
 ## Git
