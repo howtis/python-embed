@@ -139,11 +139,37 @@ class PythonProcessManager {
     }
 
     /**
+     * Returns the OS-level PID of the Python process, or -1 if
+     * the process has not been started or the PID is unavailable.
+     */
+    long getPid() {
+        if (process == null) return -1;
+        try {
+            return process.pid();
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /**
      * Gracefully shuts down the Python process using default timeouts
      * (5 seconds graceful wait, 2 seconds force-wait).
      */
     void close() {
         close(5_000, 2_000);
+    }
+
+    /**
+     * Force-terminates the Python process immediately, without
+     * attempting a graceful exit. Intended for JVM shutdown hooks
+     * where in-flight I/O may already be broken.
+     */
+    void hardShutdown() {
+        running = false;
+        if (process != null && process.isAlive()) {
+            process.destroyForcibly();
+        }
+        protocol.cancelAll(new RuntimeException("Python process terminated (JVM shutdown)"));
     }
 
     /**

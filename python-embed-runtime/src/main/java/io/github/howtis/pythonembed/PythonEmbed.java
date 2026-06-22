@@ -83,6 +83,7 @@ public class PythonEmbed implements AutoCloseable {
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
     private Path venvPath;
     private Path bridgePath;
+    private Thread processCleanupHook;
 
     PythonEmbed(Options options) {
         this.venvExtractor = new VenvExtractor();
@@ -177,6 +178,12 @@ public class PythonEmbed implements AutoCloseable {
         processManager.start(venvPath, bridgePath, env,
                 options.maxCodeLength(),
                 options.pythonExecutable(), options.startupTimeoutMs());
+
+        // Ensure the Python process is killed on JVM exit
+        processCleanupHook = new Thread(
+                () -> processManager.hardShutdown(),
+                "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(processCleanupHook);
 
         setupCallbackDispatcher();
 
@@ -611,6 +618,14 @@ public class PythonEmbed implements AutoCloseable {
         return processManager.isRunning();
     }
 
+    long getPid() {
+        return processManager.getPid();
+    }
+
+    void hardShutdown() {
+        processManager.hardShutdown();
+    }
+
     /**
      * Registers a callback handler that Python can call via
      * {@code _bridge.call(name, ...)}.
@@ -655,6 +670,17 @@ public class PythonEmbed implements AutoCloseable {
     }
 
     private void closeInternal(long waitMs, long forceWaitMs) {
+        // Remove the JVM-shutdown cleanup hook (process is being
+        // closed explicitly, so the hook should not fire later).
+        if (processCleanupHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(processCleanupHook);
+            } catch (Exception ignored) {
+                // Hook may have already run or been removed
+            }
+            processCleanupHook = null;
+        }
+
         // Release all tracked handles
         for (PythonHandle handle : handles) {
             try {

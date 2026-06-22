@@ -25,3 +25,7 @@ obsidian vault="agent-memory" read path="Preferences/workflow.md"
 
 - Update `Tasks/active.md` and `Decisions/{title}.md`
 - Rebuild `_Index.md` if many notes were added
+
+## Git
+
+- Never add `Co-authored-by` trailer to commits.

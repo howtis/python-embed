@@ -86,6 +86,7 @@ public class PythonEmbedPool implements AutoCloseable {
 
     private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
+    private final Thread poolCleanupHook;
 
     /**
      * Wraps a {@link PythonEmbed} with pool bookkeeping fields.
@@ -224,6 +225,10 @@ public class PythonEmbedPool implements AutoCloseable {
                 MAINTENANCE_INTERVAL_MS,
                 MAINTENANCE_INTERVAL_MS,
                 TimeUnit.MILLISECONDS);
+
+        // Ensure all Python subprocesses are cleaned up on JVM exit
+        poolCleanupHook = new Thread(this::close, "python-embed-pool-cleanup");
+        Runtime.getRuntime().addShutdownHook(poolCleanupHook);
     }
 
     // ------------------------------------------------------------------
@@ -727,6 +732,13 @@ public class PythonEmbedPool implements AutoCloseable {
     public void close(long timeout, TimeUnit unit) {
         if (closed) return;
         closed = true;
+
+        // Remove the JVM-shutdown cleanup hook
+        try {
+            Runtime.getRuntime().removeShutdownHook(poolCleanupHook);
+        } catch (Exception ignored) {
+            // Hook may have already run or been removed
+        }
 
         // Stop accepting new work
         maintenanceExecutor.shutdownNow();

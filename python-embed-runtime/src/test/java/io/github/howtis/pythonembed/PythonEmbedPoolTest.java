@@ -418,6 +418,89 @@ class PythonEmbedPoolTest {
     }
 
     // ------------------------------------------------------------------
+    // Process cleanup
+    // ------------------------------------------------------------------
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void close_killsPythonProcess() throws Exception {
+        PythonEmbed embed = PythonEmbed.create(PythonEmbed.Options.defaults());
+        try {
+            long pid = embed.getPid();
+            assertTrue(pid > 0, "Python process should be started");
+            assertTrue(embed.isOpen(), "Embed should be open");
+
+            embed.close();
+
+            assertFalse(embed.isOpen(), "Embed should be closed");
+            assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),
+                    "Python process should not be alive after close");
+        } finally {
+            embed.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void hardShutdown_killsPythonProcess() throws Exception {
+        PythonEmbed embed = PythonEmbed.create(PythonEmbed.Options.defaults());
+        try {
+            long pid = embed.getPid();
+            assertTrue(pid > 0, "Python process should be started");
+            assertTrue(embed.isOpen(), "Embed should be open");
+
+            embed.hardShutdown();
+
+            assertFalse(embed.isOpen(), "Embed should be closed after hard shutdown");
+            assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),
+                    "Python process should not be alive after hard shutdown");
+        } finally {
+            embed.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void poolClose_killsAllPythonProcesses() throws Exception {
+        PythonEmbedPool pool2 = PythonEmbedPool.builder().minPool(2).maxPool(2).build();
+        try {
+            waitForPoolSize(pool2, 2, 15_000);
+
+            // Collect PIDs of all running instances
+            Deque<?> instances = getInstances(pool2);
+            assertEquals(2, instances.size(), "Pool should have 2 instances");
+
+            int i = 0;
+            long[] pids = new long[2];
+            for (Object pi : instances) {
+                Field embedField = pi.getClass().getDeclaredField("embed");
+                embedField.setAccessible(true);
+                PythonEmbed e = (PythonEmbed) embedField.get(pi);
+                pids[i] = e.getPid();
+                i++;
+            }
+
+            assertTrue(pids[0] > 0 && pids[1] > 0, "Both Python processes should be running");
+
+            pool2.close();
+
+            for (long pid : pids) {
+                assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),
+                        "Python process " + pid + " should not be alive after pool close");
+            }
+        } finally {
+            pool2.close();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Deque<?> getInstances(PythonEmbedPool pool) throws Exception {
+        java.lang.reflect.Field f = PythonEmbedPool.class.getDeclaredField("instances");
+        f.setAccessible(true);
+        return (Deque<?>) f.get(pool);
+    }
+
+    // ------------------------------------------------------------------
     // Callback broadcast
     // ------------------------------------------------------------------
 
