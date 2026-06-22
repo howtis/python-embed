@@ -37,7 +37,7 @@ That's it. The Gradle plugin handles Python installation, venv creation, and pac
 - **Full CPython compatibility** — numpy, scipy, torch, matplotlib, and all C extensions work
 - **Zero setup** — one Gradle plugin line + a package list, no manual Python installation needed
 - **Crash isolation** — Python segfaults never kill the JVM; each Python process runs independently
-- **Binary protocol** — MessagePack with length-prefixed frames, 2–5× faster than JSON
+- **Binary protocol** — MessagePack with length-prefixed frames
 - **Auto-scaling pool** — `PythonEmbedPool` with async `CompletableFuture` API, scales between `minPool` and `maxPool`
 - **Object handles** — keep Python objects in-process, reference by numeric ID across calls
 - **Java proxies** — wrap Python objects as Java interfaces via dynamic proxies with automatic camelCase→snake_case conversion
