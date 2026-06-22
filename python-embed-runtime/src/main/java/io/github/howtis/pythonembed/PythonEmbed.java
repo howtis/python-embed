@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -819,7 +820,7 @@ public class PythonEmbed implements AutoCloseable {
     // ------------------------------------------------------------------
 
     private static final int ARG_MAX_DEPTH = 20;
-    private static final int ARG_MAX_COLLECTION_SIZE = 1000;
+    private static final int ARG_MAX_COLLECTION_SIZE = 5000;
 
     /**
      * Converts a Java value to a safe Python literal string
@@ -838,14 +839,16 @@ public class PythonEmbed implements AutoCloseable {
      * PythonEmbed.arg("hello")     -&gt; 'hello'
      * PythonEmbed.arg(42)          -&gt; 42
      * PythonEmbed.arg(true)        -&gt; True
-     * PythonEmbed.arg(List.of(1, 2)) -&gt; [1, 2]
-     * PythonEmbed.arg(Map.of("k", 1)) -&gt; {'k': 1}
+     * PythonEmbed.arg(List.of(1, 2))   -&gt; [1, 2]
+     * PythonEmbed.arg(Set.of(1, 2))    -&gt; {1, 2}
+     * PythonEmbed.arg(Map.of("k", 1))  -&gt; {'k': 1}
+     * PythonEmbed.arg(new byte[]{0, 255}) -&gt; b'\x00\xff'
      * }</pre>
      *
      * @param value the Java value to convert (null allowed)
      * @return a Python literal expression as a String
      * @throws IllegalArgumentException if nesting depth exceeds 20
-     *         or collection/map size exceeds 1000
+     *         or collection/map/bytes size exceeds 5000
      */
     public static String arg(Object value) {
         return arg(value, 0);
@@ -888,6 +891,43 @@ public class PythonEmbed implements AutoCloseable {
         }
         if (value instanceof String) {
             return "'" + escapePythonString((String) value) + "'";
+        }
+        if (value instanceof byte[] bytes) {
+            if (bytes.length > ARG_MAX_COLLECTION_SIZE) {
+                throw new IllegalArgumentException(
+                        "PythonEmbed.arg() bytes length " + bytes.length
+                                + " exceeds limit of " + ARG_MAX_COLLECTION_SIZE);
+            }
+            StringBuilder sb = new StringBuilder(bytes.length * 5 + 3);
+            sb.append("b'");
+            for (byte b : bytes) {
+                sb.append("\\x");
+                sb.append(String.format("%02x", b & 0xFF));
+            }
+            sb.append("'");
+            return sb.toString();
+        }
+        if (value instanceof Set<?> set) {
+            if (set.isEmpty()) {
+                return "set()";
+            }
+            if (set.size() > ARG_MAX_COLLECTION_SIZE) {
+                throw new IllegalArgumentException(
+                        "PythonEmbed.arg() set size " + set.size()
+                                + " exceeds limit of " + ARG_MAX_COLLECTION_SIZE);
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append('{');
+            boolean first = true;
+            for (Object elem : set) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                sb.append(arg(elem, depth + 1));
+                first = false;
+            }
+            sb.append('}');
+            return sb.toString();
         }
         if (value instanceof Collection<?> coll) {
             if (coll.size() > ARG_MAX_COLLECTION_SIZE) {

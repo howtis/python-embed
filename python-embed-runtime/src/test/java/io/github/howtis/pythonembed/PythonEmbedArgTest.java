@@ -197,11 +197,65 @@ class PythonEmbedArgTest {
     }
 
     @Test
-    void set_convertedToList() {
+    void set_integers() {
         Set<Integer> set = new LinkedHashSet<>();
         set.add(1);
         set.add(2);
-        assertEquals("[1, 2]", PythonEmbed.arg(set));
+        assertEquals("{1, 2}", PythonEmbed.arg(set));
+    }
+
+    @Test
+    void set_empty() {
+        assertEquals("set()", PythonEmbed.arg(Set.of()));
+    }
+
+    @Test
+    void set_strings() {
+        Set<String> set = new LinkedHashSet<>();
+        set.add("a");
+        set.add("b");
+        assertEquals("{'a', 'b'}", PythonEmbed.arg(set));
+    }
+
+    @Test
+    void setSizeLimit_exceeded_throws() {
+        Set<Integer> large = new LinkedHashSet<>();
+        for (int i = 0; i < 5001; i++) {
+            large.add(i);
+        }
+        assertThrows(IllegalArgumentException.class, () -> PythonEmbed.arg(large));
+    }
+
+    @Test
+    void bytes_empty() {
+        assertEquals("b''", PythonEmbed.arg(new byte[0]));
+    }
+
+    @Test
+    void bytes_basic() {
+        assertEquals("b'\\x00\\xff\\xab\\xcd'", PythonEmbed.arg(new byte[]{0, -1, -85, -51}));
+    }
+
+    @Test
+    void bytes_allValues() {
+        byte[] data = new byte[256];
+        for (int i = 0; i < 256; i++) {
+            data[i] = (byte) i;
+        }
+        StringBuilder expected = new StringBuilder(256 * 5 + 3);
+        expected.append("b'");
+        for (int i = 0; i < 256; i++) {
+            expected.append("\\x");
+            expected.append(String.format("%02x", i));
+        }
+        expected.append("'");
+        assertEquals(expected.toString(), PythonEmbed.arg(data));
+    }
+
+    @Test
+    void bytesSizeLimit_exceeded_throws() {
+        byte[] large = new byte[5001];
+        assertThrows(IllegalArgumentException.class, () -> PythonEmbed.arg(large));
     }
 
     @Test
@@ -288,7 +342,7 @@ class PythonEmbedArgTest {
     @Test
     void collectionSizeLimit_exceeded_throws() {
         List<Integer> large = new ArrayList<>();
-        for (int i = 0; i < 1001; i++) {
+        for (int i = 0; i < 5001; i++) {
             large.add(i);
         }
         assertThrows(IllegalArgumentException.class, () -> PythonEmbed.arg(large));
@@ -297,7 +351,7 @@ class PythonEmbedArgTest {
     @Test
     void mapSizeLimit_exceeded_throws() {
         Map<String, Integer> large = new LinkedHashMap<>();
-        for (int i = 0; i < 1001; i++) {
+        for (int i = 0; i < 5001; i++) {
             large.put("key" + i, i);
         }
         assertThrows(IllegalArgumentException.class, () -> PythonEmbed.arg(large));
