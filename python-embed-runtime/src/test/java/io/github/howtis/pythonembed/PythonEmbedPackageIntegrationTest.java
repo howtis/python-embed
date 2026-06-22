@@ -23,7 +23,7 @@ class PythonEmbedPackageIntegrationTest {
     private static PythonEmbed py;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    static void setUp() {
         py = PythonEmbed.create(PythonEmbed.Options.builder()
                 .venvPath(Path.of("build", "python-venv")).build());
     }
@@ -34,7 +34,7 @@ class PythonEmbedPackageIntegrationTest {
     }
 
     @BeforeEach
-    void clearState() throws Exception {
+    void clearState() {
         py.exec("globals().clear()");
     }
 
@@ -44,7 +44,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_importAndVersion() throws Exception {
+    void numpy_importAndVersion() {
         py.exec("import numpy as np");
         String version = py.eval("np.__version__").asString();
         assertNotNull(version);
@@ -53,7 +53,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_createArrayAndSum() throws Exception {
+    void numpy_createArrayAndSum() {
         py.exec("import numpy as np");
         int result = py.eval("np.sum(np.array([1, 2, 3, 4, 5])).item()").asInt();
         assertEquals(15, result);
@@ -61,7 +61,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_arangeAndMean() throws Exception {
+    void numpy_arangeAndMean() {
         py.exec("import numpy as np");
         double result = py.eval("np.mean(np.arange(1, 11)).item()").asDouble();
         assertEquals(5.5, result, 0.001);
@@ -69,7 +69,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_zerosAndShape() throws Exception {
+    void numpy_zerosAndShape() {
         py.exec("import numpy as np");
         py.exec("arr = np.zeros((3, 4))");
         PythonValue shape = py.eval("arr.shape");
@@ -82,7 +82,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_handleRefAndCall() throws Exception {
+    void numpy_handleRefAndCall() {
         py.exec("import numpy as np");
         py.exec("arr = np.array([10, 20, 30])");
         try (PythonHandle handle = py.ref("arr")) {
@@ -98,7 +98,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_handleGetAttr() throws Exception {
+    void numpy_handleGetAttr() {
         py.exec("import numpy as np");
         py.exec("arr = np.array([[1, 2], [3, 4]])");
         try (PythonHandle handle = py.ref("arr")) {
@@ -111,7 +111,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_elementWiseOperation() throws Exception {
+    void numpy_elementWiseOperation() {
         py.exec("import numpy as np");
         py.exec("a = np.array([1, 2, 3])");
         py.exec("b = np.array([4, 5, 6])");
@@ -121,7 +121,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_linspace() throws Exception {
+    void numpy_linspace() {
         py.exec("import numpy as np");
         List<Double> result = py.eval("np.linspace(0, 1, 5).tolist()").asList(Double.class);
         assertEquals(5, result.size());
@@ -131,7 +131,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_randomWithSeed() throws Exception {
+    void numpy_randomWithSeed() {
         py.exec("import numpy as np");
         py.exec("np.random.seed(42)");
         double result = py.eval("np.random.rand()").asDouble();
@@ -140,7 +140,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void numpy_errorShapeMismatch() throws Exception {
+    void numpy_errorShapeMismatch() {
         py.exec("import numpy as np");
         py.exec("a = np.array([1, 2, 3])");
         py.exec("b = np.array([[1, 2], [3, 4]])");
@@ -156,7 +156,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_importAndVersion() throws Exception {
+    void pandas_importAndVersion() {
         py.exec("import pandas as pd");
         String version = py.eval("pd.__version__").asString();
         assertNotNull(version);
@@ -165,7 +165,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_createDataFrame() throws Exception {
+    void pandas_createDataFrame() {
         py.exec("import pandas as pd");
         py.exec("df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})");
         List<Double> colA = py.eval("df['a'].tolist()").asList(Double.class);
@@ -174,7 +174,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_describe() throws Exception {
+    void pandas_describe() {
         py.exec("import pandas as pd");
         py.exec("df = pd.DataFrame({'x': [10, 20, 30, 40, 50]})");
         double mean = py.eval("df['x'].mean()").asDouble();
@@ -183,7 +183,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_handleRef() throws Exception {
+    void pandas_handleRef() {
         py.exec("import pandas as pd");
         py.exec("df = pd.DataFrame({'name': ['alice', 'bob'], 'score': [95, 87]})");
         try (PythonHandle handle = py.ref("df")) {
@@ -199,7 +199,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_filterAndAggregate() throws Exception {
+    void pandas_filterAndAggregate() {
         py.exec("import pandas as pd");
         py.exec("df = pd.DataFrame({'x': [1, 2, 3, 4, 5]})");
         // pandas sum() returns numpy.int64 - convert with int()
@@ -209,7 +209,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void pandas_errorColumnNotFound() throws Exception {
+    void pandas_errorColumnNotFound() {
         py.exec("import pandas as pd");
         py.exec("df = pd.DataFrame({'a': [1, 2]})");
         PythonExecutionException ex = assertThrows(PythonExecutionException.class,
@@ -223,7 +223,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_importAndVersion() throws Exception {
+    void scipy_importAndVersion() {
         py.exec("import scipy");
         String version = py.eval("scipy.__version__").asString();
         assertNotNull(version);
@@ -232,7 +232,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_statsDescriptive() throws Exception {
+    void scipy_statsDescriptive() {
         py.exec("from scipy import stats");
         py.exec("data = [1, 2, 2, 3, 3, 3, 4, 4, 5]");
         // stats.mode returns numpy.int64 - convert with int()
@@ -242,7 +242,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_integrate() throws Exception {
+    void scipy_integrate() {
         py.exec("from scipy import integrate");
         py.exec("import numpy as np");
         double result = py.eval(
@@ -252,7 +252,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_linalg() throws Exception {
+    void scipy_linalg() {
         py.exec("from scipy import linalg");
         py.exec("import numpy as np");
         py.exec("a = np.array([[1, 2], [3, 4]])");
@@ -262,7 +262,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_optimize() throws Exception {
+    void scipy_optimize() {
         py.exec("from scipy import optimize");
         py.exec("import numpy as np");
         py.exec("result = optimize.minimize(lambda x: (x - 3)**2, x0=0)");
@@ -272,7 +272,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void scipy_errorSingularMatrix() throws Exception {
+    void scipy_errorSingularMatrix() {
         py.exec("from scipy import linalg");
         py.exec("import numpy as np");
         py.exec("a = np.array([[1, 2], [2, 4]])");
@@ -288,7 +288,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void requests_importAndVersion() throws Exception {
+    void requests_importAndVersion() {
         py.exec("import requests");
         String version = py.eval("requests.__version__").asString();
         assertNotNull(version);
@@ -297,7 +297,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void requests_createSession() throws Exception {
+    void requests_createSession() {
         py.exec("import requests");
         py.exec("s = requests.Session()");
         try (PythonHandle handle = py.ref("s")) {
@@ -307,7 +307,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void requests_prepareRequest() throws Exception {
+    void requests_prepareRequest() {
         py.exec("import requests");
         py.exec("req = requests.Request('GET', 'https://httpbin.org/get')");
         py.exec("prepared = req.prepare()");
@@ -317,7 +317,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void requests_buildRequest() throws Exception {
+    void requests_buildRequest() {
         py.exec("import requests");
         py.exec("req = requests.Request('POST', 'https://example.com/api', "
                 + "data={'key': 'value'}, headers={'Authorization': 'Bearer token'})");
@@ -331,7 +331,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void requests_errorInvalidUrl() throws Exception {
+    void requests_errorInvalidUrl() {
         py.exec("import requests");
         PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> py.exec("requests.get('not-a-valid-url://', timeout=1)"));
@@ -346,7 +346,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_import() throws Exception {
+    void yaml_import() {
         py.exec("import yaml");
         // Verify module is importable by using it
         py.exec("data = yaml.safe_load('key: value')");
@@ -354,7 +354,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_parseSimple() throws Exception {
+    void yaml_parseSimple() {
         py.exec("import yaml");
         py.exec("data = yaml.safe_load('name: test\\nversion: 1.0')");
         String name = py.eval("data['name']").asString();
@@ -365,7 +365,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_parseList() throws Exception {
+    void yaml_parseList() {
         py.exec("import yaml");
         py.exec("data = yaml.safe_load('- apple\\n- banana\\n- cherry')");
         List<String> items = py.eval("data").asList(String.class);
@@ -374,7 +374,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_parseNested() throws Exception {
+    void yaml_parseNested() {
         py.exec("import yaml");
         py.exec("""
                 data = yaml.safe_load('''
@@ -390,7 +390,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_dump() throws Exception {
+    void yaml_dump() {
         py.exec("import yaml");
         py.exec("data = {'items': [1, 2, 3], 'enabled': True}");
         String output = py.eval("yaml.dump(data)").asString();
@@ -400,7 +400,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void yaml_errorInvalidYaml() throws Exception {
+    void yaml_errorInvalidYaml() {
         py.exec("import yaml");
         PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> py.eval("yaml.safe_load('key: [unclosed')"));
@@ -415,7 +415,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_importParser() throws Exception {
+    void dateutil_importParser() {
         py.exec("from dateutil import parser");
         String result = py.eval("parser.parse('2024-01-15').isoformat()").asString();
         assertTrue(result.startsWith("2024-01-15"));
@@ -423,7 +423,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_parseIsoformat() throws Exception {
+    void dateutil_parseIsoformat() {
         py.exec("from dateutil import parser");
         String result = py.eval("parser.parse('2024-06-15T14:30:00').isoformat()").asString();
         assertTrue(result.startsWith("2024-06-15T14:30:00"));
@@ -431,7 +431,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_parseUsFormat() throws Exception {
+    void dateutil_parseUsFormat() {
         py.exec("from dateutil import parser");
         int day = py.eval("parser.parse('01/15/2024').day").asInt();
         assertEquals(15, day);
@@ -439,7 +439,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_relativedelta() throws Exception {
+    void dateutil_relativedelta() {
         py.exec("from dateutil.relativedelta import relativedelta");
         py.exec("from datetime import datetime");
         py.exec("d1 = datetime(2024, 1, 1)");
@@ -452,7 +452,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_parseWithTimezone() throws Exception {
+    void dateutil_parseWithTimezone() {
         py.exec("from dateutil import parser");
         String result = py.eval("str(parser.parse('2024-01-15T10:00:00+09:00').tzinfo)").asString();
         assertNotNull(result);
@@ -461,7 +461,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void dateutil_errorUnparseableDate() throws Exception {
+    void dateutil_errorUnparseableDate() {
         py.exec("from dateutil import parser");
         PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> py.eval("parser.parse('not a date at all')"));
@@ -474,7 +474,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void mixed_numpyToPandas() throws Exception {
+    void mixed_numpyToPandas() {
         py.exec("import numpy as np");
         py.exec("import pandas as pd");
         py.exec("arr = np.array([[1, 4], [2, 5], [3, 6]])");
@@ -486,7 +486,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void mixed_scipyStatsOnDataFrame() throws Exception {
+    void mixed_scipyStatsOnDataFrame() {
         py.exec("import numpy as np");
         py.exec("import pandas as pd");
         py.exec("from scipy import stats");
@@ -498,7 +498,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void mixed_pandasDescribeToYaml() throws Exception {
+    void mixed_pandasDescribeToYaml() {
         py.exec("import pandas as pd");
         py.exec("import yaml");
         py.exec("df = pd.DataFrame({'a': [1, 2, 3]})");
@@ -512,7 +512,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void stream_numpyArange() throws Exception {
+    void stream_numpyArange() {
         py.exec("import numpy as np");
         Iterator<PythonValue> stream = py.stream("np.arange(5)");
         int sum = 0;
@@ -527,7 +527,7 @@ class PythonEmbedPackageIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void batchEval_numpyOperations() throws Exception {
+    void batchEval_numpyOperations() {
         py.exec("import numpy as np");
         py.exec("arr = np.array([10, 20, 30, 40, 50])");
         List<PythonValue> results = py.batchEval(List.of(

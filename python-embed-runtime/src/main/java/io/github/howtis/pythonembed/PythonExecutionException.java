@@ -3,7 +3,7 @@ package io.github.howtis.pythonembed;
 /**
  * Thrown when a Python evaluation or execution fails.
  */
-public class PythonExecutionException extends Exception {
+public class PythonExecutionException extends RuntimeException {
 
     private final String pythonTraceback;
     private final String causeCode;
@@ -30,6 +30,21 @@ public class PythonExecutionException extends Exception {
         super(message);
         this.pythonTraceback = pythonTraceback;
         this.causeCode = causeCode;
+    }
+
+    /**
+     * Wraps a checked exception as a PythonExecutionException.
+     * If the cause is already a PythonExecutionException, returns it as-is.
+     *
+     * @param operation description of the operation that failed
+     * @param cause     the original exception
+     * @return a PythonExecutionException (unchecked)
+     */
+    public static PythonExecutionException wrap(String operation, Throwable cause) {
+        if (cause instanceof PythonExecutionException) {
+            return (PythonExecutionException) cause;
+        }
+        return new PythonExecutionException(operation + " failed: " + cause.getMessage(), cause);
     }
 
     /**

@@ -19,7 +19,7 @@ class PythonEmbedCallbackTest {
     private static PythonEmbed py;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    static void setUp() {
         py = PythonEmbed.create(PythonEmbed.Options.defaults());
     }
 
@@ -38,7 +38,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void basicEvalWorks() throws Exception {
+    void basicEvalWorks() {
         PythonValue result = py.eval("1 + 1");
         assertEquals(2, result.asInt());
     }
@@ -47,7 +47,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_returnsValue() throws Exception {
+    void call_returnsValue() {
         py.registerCallback("add", args -> ((Number) args[0]).intValue() + ((Number) args[1]).intValue());
 
         PythonValue result = py.eval("_bridge.call('add', 3, 4)");
@@ -56,7 +56,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_withStringArg() throws Exception {
+    void call_withStringArg() {
         py.registerCallback("greet", args -> "Hello, " + args[0] + "!");
 
         PythonValue result = py.eval("_bridge.call('greet', 'World')");
@@ -65,7 +65,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_withListArg() throws Exception {
+    void call_withListArg() {
         py.registerCallback("first", args -> ((List<?>) args[0]).get(0));
 
         PythonValue result = py.eval("_bridge.call('first', [10, 20, 30])");
@@ -74,7 +74,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_withNoArgs() throws Exception {
+    void call_withNoArgs() {
         py.registerCallback("now", args -> "ok");
 
         PythonValue result = py.eval("_bridge.call('now')");
@@ -83,7 +83,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_returnsNull() throws Exception {
+    void call_returnsNull() {
         py.registerCallback("nothing", args -> null);
 
         PythonValue result = py.eval("_bridge.call('nothing')");
@@ -133,7 +133,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void push_doesNotBlockPython() throws Exception {
+    void push_doesNotBlockPython() {
         AtomicInteger received = new AtomicInteger(0);
         py.registerPushHandler("log", (name, value) -> {
             received.set(((Number) value).intValue());
@@ -147,7 +147,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void push_handlerThrows_noEffect() throws Exception {
+    void push_handlerThrows_noEffect() {
         py.registerPushHandler("failing", (name, value) -> {
             throw new RuntimeException("Push handler failure");
         });
@@ -162,7 +162,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void multipleCallsAndPushes_duringExec() throws Exception {
+    void multipleCallsAndPushes_duringExec() {
         AtomicInteger callCount = new AtomicInteger(0);
         List<Object> pushValues = new ArrayList<>();
 
@@ -181,7 +181,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_nestedCallback() throws Exception {
+    void call_nestedCallback() {
         py.registerCallback("outer", args -> {
             // The inner call goes back to Java, which calls another handler
             // The result comes back from Python's eval
@@ -204,7 +204,7 @@ class PythonEmbedCallbackTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_withMultipleArgs_ofDifferentTypes() throws Exception {
+    void call_withMultipleArgs_ofDifferentTypes() {
         AtomicReference<Object[]> captured = new AtomicReference<>();
         py.registerCallback("capture", args -> {
             captured.set(args);

@@ -23,7 +23,7 @@ class PythonEmbedBinaryIntegrationTest {
     private static PythonEmbed py;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    static void setUp() {
         py = PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .venvPath(Path.of("build", "python-venv")).build());
@@ -35,7 +35,7 @@ class PythonEmbedBinaryIntegrationTest {
     }
 
     @BeforeEach
-    void clearState() throws Exception {
+    void clearState() {
         py.exec("globals().clear()");
     }
 
@@ -43,13 +43,13 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_simpleExpression_returnsInt() throws Exception {
+    void eval_simpleExpression_returnsInt() {
         assertEquals(6, py.eval("sum([1, 2, 3])").asInt());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_withState_fromExec() throws Exception {
+    void eval_withState_fromExec() {
         py.exec("x = 10");
         py.exec("y = 20");
         assertEquals(30, py.eval("x + y").asInt());
@@ -57,32 +57,32 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_stringResult() throws Exception {
+    void eval_stringResult() {
         assertEquals("HELLO", py.eval("'hello'.upper()").asString());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_booleanResult() throws Exception {
+    void eval_booleanResult() {
         assertTrue(py.eval("1 + 1 == 2").asBoolean());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_doubleResult() throws Exception {
+    void eval_doubleResult() {
         assertEquals(6.28, py.eval("3.14 * 2").asDouble(), 0.001);
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_listResult() throws Exception {
+    void eval_listResult() {
         List<Double> list = py.eval("[i * 2 for i in range(5)]").asList(Double.class);
         assertEquals(List.of(0.0, 2.0, 4.0, 6.0, 8.0), list);
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_largeList_roundtrip() throws Exception {
+    void eval_largeList_roundtrip() {
         PythonValue result = py.eval("list(range(1000))");
         List<Double> list = result.asList(Double.class);
         assertEquals(1000, list.size());
@@ -112,14 +112,14 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_multiline_functionDef() throws Exception {
+    void exec_multiline_functionDef() {
         py.exec("def add(a, b):\n    return a + b\n");
         assertEquals(7, py.eval("add(3, 4)").asInt());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void multipleEval_preservesState() throws Exception {
+    void multipleEval_preservesState() {
         py.exec("counter = 0");
         assertEquals(0, py.eval("counter").asInt());
         py.exec("counter += 1");
@@ -130,7 +130,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_classDef() throws Exception {
+    void exec_classDef() {
         py.exec("""
                 class Counter:
                     def __init__(self):
@@ -148,7 +148,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void ref_getIntVariable_returnsHandle() throws Exception {
+    void ref_getIntVariable_returnsHandle() {
         py.exec("x = 42");
         try (PythonHandle handle = py.ref("x")) {
             assertEquals("int", handle.pythonType());
@@ -158,7 +158,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void ref_getStringVariable_returnsHandle() throws Exception {
+    void ref_getStringVariable_returnsHandle() {
         py.exec("s = 'hello'");
         try (PythonHandle handle = py.ref("s")) {
             assertEquals("str", handle.pythonType());
@@ -177,7 +177,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_noArgMethod_returnsResult() throws Exception {
+    void call_noArgMethod_returnsResult() {
         py.exec("s = 'hello world'");
         try (PythonHandle handle = py.ref("s")) {
             PythonValue result = handle.call("upper");
@@ -187,7 +187,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_methodWithSingleArg_returnsResult() throws Exception {
+    void call_methodWithSingleArg_returnsResult() {
         py.exec("s = 'hello world'");
         try (PythonHandle handle = py.ref("s")) {
             PythonValue result = handle.call("split", " ");
@@ -198,7 +198,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_methodWithMultipleArgs_returnsResult() throws Exception {
+    void call_methodWithMultipleArgs_returnsResult() {
         py.exec("s = 'hello world'");
         try (PythonHandle handle = py.ref("s")) {
             PythonValue result = handle.call("replace", "world", "there");
@@ -208,7 +208,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_onClassInstance() throws Exception {
+    void call_onClassInstance() {
         py.exec("""
                 class Adder:
                     def __init__(self, n):
@@ -225,7 +225,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void call_onListMethod() throws Exception {
+    void call_onListMethod() {
         py.exec("lst = [3, 1, 2]");
         try (PythonHandle handle = py.ref("lst")) {
             handle.call("sort");
@@ -238,7 +238,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void getAttr_simpleAttribute() throws Exception {
+    void getAttr_simpleAttribute() {
         py.exec("""
                 class Foo:
                     def __init__(self):
@@ -252,7 +252,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void getAttr_docAttribute() throws Exception {
+    void getAttr_docAttribute() {
         py.exec("""
                 def my_func():
                     \"""Documentation string.\"""
@@ -267,7 +267,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void release_makesHandleUnusable() throws Exception {
+    void release_makesHandleUnusable() {
         py.exec("x = 42");
         PythonHandle handle = py.ref("x");
         handle.release();
@@ -276,7 +276,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void close_releasesHandle() throws Exception {
+    void close_releasesHandle() {
         py.exec("x = 42");
         PythonHandle handle = py.ref("x");
         handle.close();
@@ -285,7 +285,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void multipleHandles_independent() throws Exception {
+    void multipleHandles_independent() {
         py.exec("a = [1, 2, 3]");
         py.exec("b = 'hello'");
         try (PythonHandle handleA = py.ref("a");
@@ -300,7 +300,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void handle_survivesAcrossCalls() throws Exception {
+    void handle_survivesAcrossCalls() {
         // Object handles should survive across multiple eval/exec calls
         py.exec("""
                 class Counter:
@@ -319,7 +319,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void handlesReleasedOnPythonEmbedClose() throws Exception {
+    void handlesReleasedOnPythonEmbedClose() {
         // All handles should be released when PythonEmbed is closed
         PythonEmbed py2 = PythonEmbed.create(
                 PythonEmbed.Options.builder()
@@ -336,7 +336,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_list_returnsAllItems() throws Exception {
+    void stream_list_returnsAllItems() {
         Iterator<PythonValue> iter = py.stream("[1, 2, 3]");
         List<Integer> items = new ArrayList<>();
         while (iter.hasNext()) {
@@ -347,7 +347,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_generator_returnsAllItems() throws Exception {
+    void stream_generator_returnsAllItems() {
         Iterator<PythonValue> iter = py.stream("(i * 2 for i in range(5))");
         List<Integer> items = new ArrayList<>();
         while (iter.hasNext()) {
@@ -358,7 +358,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_range_generator() throws Exception {
+    void stream_range_generator() {
         Iterator<PythonValue> iter = py.stream("range(3)");
         List<Integer> items = new ArrayList<>();
         while (iter.hasNext()) {
@@ -369,14 +369,14 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_emptyList_returnsNoItems() throws Exception {
+    void stream_emptyList_returnsNoItems() {
         Iterator<PythonValue> iter = py.stream("[]");
         assertFalse(iter.hasNext());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_singleValue_returnsOneItem() throws Exception {
+    void stream_singleValue_returnsOneItem() {
         Iterator<PythonValue> iter = py.stream("42");
         assertTrue(iter.hasNext());
         assertEquals(42, iter.next().asInt());
@@ -385,7 +385,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_string_returnsSingleItem() throws Exception {
+    void stream_string_returnsSingleItem() {
         // Strings are not treated as iterables by _is_iterable
         Iterator<PythonValue> iter = py.stream("'hello'");
         assertTrue(iter.hasNext());
@@ -395,7 +395,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_partialConsumption_breaksEarly() throws Exception {
+    void stream_partialConsumption_breaksEarly() {
         Iterator<PythonValue> iter = py.stream("range(100)");
         int count = 0;
         while (iter.hasNext() && count < 5) {
@@ -408,7 +408,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_largeGenerator() throws Exception {
+    void stream_largeGenerator() {
         Iterator<PythonValue> iter = py.stream("range(10000)");
         int count = 0;
         while (iter.hasNext()) {
@@ -420,7 +420,7 @@ class PythonEmbedBinaryIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_throwsNoSuchElementException_whenStreamExhausted() throws Exception {
+    void stream_throwsNoSuchElementException_whenStreamExhausted() {
         Iterator<PythonValue> iter = py.stream("[1]");
         iter.next();
         assertFalse(iter.hasNext());

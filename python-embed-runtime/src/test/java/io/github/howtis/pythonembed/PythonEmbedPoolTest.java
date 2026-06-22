@@ -34,7 +34,7 @@ class PythonEmbedPoolTest {
     private static PythonEmbedPool pool;
 
     @BeforeAll
-    static void setUp() throws IOException {
+    static void setUp() {
         pool = PythonEmbedPool.builder().minPool(2).maxPool(4).build();
     }
 
@@ -160,7 +160,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void eval_syntaxError_propagatesAsExecutionException() throws Exception {
+    void eval_syntaxError_propagatesAsExecutionException() {
         CompletableFuture<PythonValue> future = pool.eval("1 + ");
         ExecutionException ex = assertThrows(ExecutionException.class,
                 () -> future.get(3, TimeUnit.SECONDS));
@@ -170,7 +170,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void eval_nameError_propagates() throws Exception {
+    void eval_nameError_propagates() {
         CompletableFuture<PythonValue> future = pool.eval("undefined_variable");
         ExecutionException ex = assertThrows(ExecutionException.class,
                 () -> future.get(3, TimeUnit.SECONDS));
@@ -267,7 +267,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void close_thenSubmit_throwsIllegalStateException() throws Exception {
+    void close_thenSubmit_throwsIllegalStateException() {
         PythonEmbedPool localPool = PythonEmbedPool.builder().maxPool(1).build();
         localPool.close();
 
@@ -278,7 +278,7 @@ class PythonEmbedPoolTest {
     }
 
     @Test
-    void close_idempotent() throws Exception {
+    void close_idempotent() {
         PythonEmbedPool localPool = PythonEmbedPool.builder().maxPool(1).build();
         localPool.close();
         assertDoesNotThrow(() -> localPool.close());
@@ -418,7 +418,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void close_killsPythonProcess() throws Exception {
+    void close_killsPythonProcess() {
         PythonEmbed embed = PythonEmbed.create(PythonEmbed.Options.defaults());
         try {
             long pid = embed.getPid();
@@ -437,7 +437,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void hardShutdown_killsPythonProcess() throws Exception {
+    void hardShutdown_killsPythonProcess() {
         PythonEmbed embed = PythonEmbed.create(PythonEmbed.Options.defaults());
         try {
             long pid = embed.getPid();
@@ -787,7 +787,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void healthCheck_healthyPool_returnsZero() throws Exception {
+    void healthCheck_healthyPool_returnsZero() {
         PythonEmbedPool pool = PythonEmbedPool.builder().minPool(2).maxPool(2).build();
         try {
             assertEquals(0, pool.healthCheck(),
@@ -827,7 +827,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void close_withCustomTimeout_succeeds() throws Exception {
+    void close_withCustomTimeout_succeeds() {
         PythonEmbedPool timeoutPool = PythonEmbedPool.builder().maxPool(1).build();
         assertDoesNotThrow(() -> timeoutPool.close(1, TimeUnit.SECONDS));
     }
@@ -845,7 +845,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void timeoutOverride_eval_shortTimeout_throws() throws Exception {
+    void timeoutOverride_eval_shortTimeout_throws() {
         // Use a separate pool because the Python process will remain
         // stuck in time.sleep() even after the Java-side timeout.
         PythonEmbedPool shortPool = PythonEmbedPool.builder().maxPool(1).build();
@@ -854,7 +854,8 @@ class PythonEmbedPoolTest {
                     "__import__('time').sleep(10)", 100);
             ExecutionException ex = assertThrows(ExecutionException.class,
                     () -> future.get(5, TimeUnit.SECONDS));
-            assertTrue(ex.getCause() instanceof TimeoutException);
+            assertTrue(ex.getCause() instanceof PythonExecutionException);
+            assertTrue(ex.getCause().getCause() instanceof TimeoutException);
         } finally {
             shortPool.close();
         }
@@ -888,7 +889,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void timeoutOverride_exec_shortTimeout_throws() throws Exception {
+    void timeoutOverride_exec_shortTimeout_throws() {
         // Use a separate pool because the Python process will remain
         // stuck in time.sleep() even after the Java-side timeout.
         PythonEmbedPool shortPool = PythonEmbedPool.builder().maxPool(1).build();
@@ -897,7 +898,8 @@ class PythonEmbedPoolTest {
                     "__import__('time').sleep(10)", 100);
             ExecutionException ex = assertThrows(ExecutionException.class,
                     () -> future.get(5, TimeUnit.SECONDS));
-            assertTrue(ex.getCause() instanceof TimeoutException);
+            assertTrue(ex.getCause() instanceof PythonExecutionException);
+            assertTrue(ex.getCause().getCause() instanceof TimeoutException);
         } finally {
             shortPool.close();
         }
@@ -1029,7 +1031,7 @@ class PythonEmbedPoolTest {
 
     @Test
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
-    void preWarming_poolReturnsQuicklyWithOneInstance() throws Exception {
+    void preWarming_poolReturnsQuicklyWithOneInstance() {
         PythonEmbedPool pool = PythonEmbedPool.builder().minPool(4).maxPool(4).build();
         try {
             assertTrue(pool.size() >= 1,

@@ -26,7 +26,7 @@ class PythonEmbedExplicitPathTest {
     private PythonEmbed py;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         // The Gradle plugin creates the venv at build/python-venv
         // relative to the module directory.
         Path venvPath = Path.of("build", "python-venv");
@@ -49,7 +49,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_simpleExpression_returnsInt() throws Exception {
+    void eval_simpleExpression_returnsInt() {
         assumeVenvExists();
         PythonValue result = py.eval("sum([1, 2, 3])");
         assertEquals(6, result.asInt());
@@ -57,7 +57,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_preservesState() throws Exception {
+    void exec_preservesState() {
         assumeVenvExists();
         py.exec("x = 42");
         assertEquals(42, py.eval("x").asInt());
@@ -65,7 +65,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_stringResult() throws Exception {
+    void eval_stringResult() {
         assumeVenvExists();
         PythonValue result = py.eval("'hello'.upper()");
         assertEquals("HELLO", result.asString());
@@ -84,7 +84,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void create_withEnvVars_passesToProcess() throws Exception {
+    void create_withEnvVars_passesToProcess() {
         Path venvPath = Path.of("build", "python-venv");
         if (!venvPath.toFile().exists()) {
             return;
@@ -100,13 +100,14 @@ class PythonEmbedExplicitPathTest {
     }
 
     @Test
-    void create_nonexistentPath_throwsIOException() {
+    void create_nonexistentPath_throwsPythonExecutionException() {
         Path nonexistent = Path.of("/nonexistent/python-embed-venv-" + System.nanoTime());
-        IOException ex = assertThrows(IOException.class,
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .venvPath(nonexistent).build()));
-        assertTrue(ex.getMessage().contains("does not exist"));
+        assertTrue(ex.getCause() instanceof IOException);
+        assertTrue(ex.getCause().getMessage().contains("does not exist"));
     }
 
     // ------------------------------------------------------------------
@@ -115,7 +116,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_rangeYieldsValues() throws Exception {
+    void stream_rangeYieldsValues() {
         assumeVenvExists();
         Iterator<PythonValue> iter = py.stream("range(3)");
         assertTrue(iter.hasNext());
@@ -127,7 +128,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void stream_listYieldsValues() throws Exception {
+    void stream_listYieldsValues() {
         assumeVenvExists();
         Iterator<PythonValue> iter = py.stream("[10, 20, 30]");
         assertTrue(iter.hasNext());
@@ -143,7 +144,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void ref_createsHandle() throws Exception {
+    void ref_createsHandle() {
         assumeVenvExists();
         py.exec("msg = 'explicit path test'");
         PythonHandle handle = py.ref("msg");
@@ -157,7 +158,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void ping_healthyProcess_returnsTrue() throws Exception {
+    void ping_healthyProcess_returnsTrue() {
         assumeVenvExists();
         assertTrue(py.ping());
     }
@@ -168,7 +169,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void close_withCustomTimeout_succeeds() throws Exception {
+    void close_withCustomTimeout_succeeds() {
         Path venvPath = Path.of("build", "python-venv");
         if (!venvPath.toFile().exists()) {
             return;
@@ -185,7 +186,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void registerCallback_pythonCallsBack() throws Exception {
+    void registerCallback_pythonCallsBack() {
         assumeVenvExists();
         py.registerCallback("double", args -> {
             int value = ((Number) args[0]).intValue();
@@ -221,7 +222,7 @@ class PythonEmbedExplicitPathTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void create_withOptions_customTimeout() throws Exception {
+    void create_withOptions_customTimeout() {
         Path venvPath = Path.of("build", "python-venv");
         if (!venvPath.toFile().exists()) {
             return;

@@ -1,6 +1,5 @@
 package io.github.howtis.pythonembed;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 
@@ -40,8 +39,6 @@ class PythonPoolProxy implements InvocationHandler {
                     embed.protocol, embed.writer, refId,
                     embed.options.timeoutMs());
             return handler.invokePython(method, args);
-        } catch (IOException e) {
-            throw new PythonExecutionException("Pool acquire failed: " + e.getMessage(), e);
         } finally {
             if (pi != null) {
                 pool.releaseInstance(pi);

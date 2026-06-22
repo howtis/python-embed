@@ -1,6 +1,5 @@
 package io.github.howtis.pythonembed;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -8,13 +7,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -100,9 +98,7 @@ public class PythonEmbedPool implements AutoCloseable {
     /**
      * Returns a new {@link Builder} for constructing a {@link PythonEmbedPool}.
      *
-     * <p>Set venv path and environment variables via
-     * {@link PythonEmbed.Options.Builder} and pass the result to
-     * {@link #options(PythonEmbed.Options)}.
+     * <p>Set venv path and environment variables via {@link PythonEmbed.Options.Builder}
      *
      * <p>Defaults:
      * <ul>
@@ -143,9 +139,8 @@ public class PythonEmbedPool implements AutoCloseable {
          * @throws IllegalArgumentException if {@code minPool < 1},
          *         {@code maxPool < minPool}, {@code idleTimeoutMs < 0},
          *         or {@code healthCheckIntervalMs < 0}
-         * @throws IOException if instance creation fails
          */
-        public PythonEmbedPool build() throws IOException {
+        public PythonEmbedPool build() {
             return new PythonEmbedPool(this);
         }
     }
@@ -154,7 +149,7 @@ public class PythonEmbedPool implements AutoCloseable {
     // Constructor
     // ------------------------------------------------------------------
 
-    private PythonEmbedPool(Builder b) throws IOException {
+    private PythonEmbedPool(Builder b) {
         if (b.minPool < 1) {
             throw new IllegalArgumentException("minPool must be >= 1, got " + b.minPool);
         }
@@ -235,7 +230,7 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 return pi.embed.eval(code);
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -261,7 +256,7 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 return pi.embed.eval(code, timeoutMs);
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -287,7 +282,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 pi = acquireInstance();
                 pi.embed.exec(code);
                 return null;
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -314,7 +309,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 pi = acquireInstance();
                 pi.embed.exec(code, timeoutMs);
                 return null;
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -338,7 +333,7 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 return pi.embed.batchEval(codes);
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -365,7 +360,7 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 return pi.embed.batchEval(codes, timeoutMs);
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -390,7 +385,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 pi = acquireInstance();
                 pi.embed.batchExec(codes);
                 return null;
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -418,7 +413,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 pi = acquireInstance();
                 pi.embed.batchExec(codes, timeoutMs);
                 return null;
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -452,7 +447,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 PooledInstance pi = acquireInstance();
                 Iterator<PythonValue> raw = pi.embed.stream(code);
                 return new PooledIterator<>(raw, pi, this);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             }
         }, executor);
@@ -474,7 +469,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 PooledInstance pi = acquireInstance();
                 Iterator<PythonValue> raw = pi.embed.stream(code, timeoutMs);
                 return new PooledIterator<>(raw, pi, this);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             }
         }, executor);
@@ -499,7 +494,7 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 return pi.embed.ref(variableName);
-            } catch (PythonExecutionException | TimeoutException | IOException e) {
+            } catch (Exception e) {
                 throw new CompletionException(e);
             } finally {
                 if (pi != null) {
@@ -666,7 +661,7 @@ public class PythonEmbedPool implements AutoCloseable {
      *       (rare, only when semaphore and instance state briefly diverge)</li>
      * </ol>
      */
-    PooledInstance acquireInstance() throws IOException {
+    PooledInstance acquireInstance() {
         if (closed) {
             throw new IllegalStateException("Pool is closed");
         }
@@ -675,7 +670,7 @@ public class PythonEmbedPool implements AutoCloseable {
             instanceSemaphore.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while waiting for Python instance", e);
+            throw PythonExecutionException.wrap("acquireInstance", e);
         }
 
         while (true) {
@@ -703,7 +698,7 @@ public class PythonEmbedPool implements AutoCloseable {
                         pi.lastUsedAt = System.currentTimeMillis();
                         instances.add(pi);
                         return pi;
-                    } catch (IOException e) {
+                    } catch (PythonExecutionException e) {
                         currentSize.decrementAndGet();
                         instanceSemaphore.release();
                         throw e;
@@ -734,7 +729,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * Creates a new PythonEmbed instance with stored options and
      * registers all pending callback/push handlers.
      */
-    private PythonEmbed createEmbed() throws IOException {
+    private PythonEmbed createEmbed() {
         PythonEmbed embed = PythonEmbed.create(options);
         for (Map.Entry<String, CallbackHandler> e : callbackHandlers.entrySet()) {
             embed.registerCallback(e.getKey(), e.getValue());
@@ -868,7 +863,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 try {
                     PythonEmbed embed = createEmbed();
                     instances.add(new PooledInstance(embed));
-                } catch (IOException e) {
+                } catch (PythonExecutionException e) {
                     currentSize.decrementAndGet();
                     logger.log(Level.WARNING,
                             "Failed to create instance for minPool guarantee", e);

@@ -67,10 +67,13 @@ public class PythonHandle implements AutoCloseable {
      * @param args   arguments to pass (primitives, strings, or null)
      * @return the method's return value
      */
-    public PythonValue call(String method, Object... args)
-            throws PythonExecutionException, TimeoutException, IOException {
+    public PythonValue call(String method, Object... args) {
         checkNotReleased();
-        return protocol.sendCall(writer, refId, method, args);
+        try {
+            return protocol.sendCall(writer, refId, method, args);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("call", e);
+        }
     }
 
     /**
@@ -79,10 +82,13 @@ public class PythonHandle implements AutoCloseable {
      * @param name attribute name
      * @return the attribute value
      */
-    public PythonValue getAttr(String name)
-            throws PythonExecutionException, TimeoutException, IOException {
+    public PythonValue getAttr(String name) {
         checkNotReleased();
-        return protocol.sendGetAttr(writer, refId, name);
+        try {
+            return protocol.sendGetAttr(writer, refId, name);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("getAttr", e);
+        }
     }
 
     /**

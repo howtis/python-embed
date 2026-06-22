@@ -25,7 +25,7 @@ class PythonEmbedIntegrationTest {
     private static PythonEmbed py;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    static void setUp() {
         py = PythonEmbed.create(PythonEmbed.Options.defaults());
     }
 
@@ -35,20 +35,20 @@ class PythonEmbedIntegrationTest {
     }
 
     @BeforeEach
-    void clearState() throws Exception {
+    void clearState() {
         py.exec("globals().clear()");
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_simpleExpression_returnsInt() throws Exception {
+    void eval_simpleExpression_returnsInt() {
         PythonValue result = py.eval("sum([1, 2, 3])");
         assertEquals(6, result.asInt());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_withState_fromExec() throws Exception {
+    void eval_withState_fromExec() {
         py.exec("x = 10");
         py.exec("y = 20");
         PythonValue result = py.eval("x + y");
@@ -57,28 +57,28 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_stringResult() throws Exception {
+    void eval_stringResult() {
         PythonValue result = py.eval("'hello'.upper()");
         assertEquals("HELLO", result.asString());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_booleanResult() throws Exception {
+    void eval_booleanResult() {
         PythonValue result = py.eval("1 + 1 == 2");
         assertTrue(result.asBoolean());
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_doubleResult() throws Exception {
+    void eval_doubleResult() {
         PythonValue result = py.eval("3.14 * 2");
         assertEquals(6.28, result.asDouble(), 0.001);
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void eval_listResult() throws Exception {
+    void eval_listResult() {
         PythonValue result = py.eval("[i * 2 for i in range(5)]");
         List<Double> list = result.asList(Double.class);
         assertEquals(List.of(0.0, 2.0, 4.0, 6.0, 8.0), list);
@@ -106,7 +106,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_multiline_functionDef() throws Exception {
+    void exec_multiline_functionDef() {
         py.exec("""
                 def add(a, b):
                     return a + b
@@ -117,7 +117,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_multiline_ifElse() throws Exception {
+    void exec_multiline_ifElse() {
         py.exec("""
                 x = 5
                 if x > 3:
@@ -130,7 +130,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_multiline_forLoop() throws Exception {
+    void exec_multiline_forLoop() {
         py.exec("""
                 total = 0
                 for i in range(1, 4):
@@ -141,7 +141,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void exec_classDef_multiline() throws Exception {
+    void exec_classDef_multiline() {
         py.exec("""
                 class Counter:
                     def __init__(self):
@@ -157,7 +157,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void multipleEval_preservesState() throws Exception {
+    void multipleEval_preservesState() {
         py.exec("counter = 0");
         assertEquals(0, py.eval("counter").asInt());
         py.exec("counter += 1");
@@ -170,7 +170,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void options_maxCodeLength_rejectsOversizedCode() throws Exception {
+    void options_maxCodeLength_rejectsOversizedCode() {
         try (PythonEmbed py2 = PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .maxCodeLength(10)
@@ -185,7 +185,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void options_maxCodeLength_allowsCodeWithinLimit() throws Exception {
+    void options_maxCodeLength_allowsCodeWithinLimit() {
         try (PythonEmbed py2 = PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .maxCodeLength(10)
@@ -197,7 +197,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void options_startupTimeout_succeedsWithValidProcess() throws Exception {
+    void options_startupTimeout_succeedsWithValidProcess() {
         try (PythonEmbed py2 = PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .startupTimeoutMs(10_000)
@@ -209,7 +209,7 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_startupTimeout_failsWithInvalidExecutable() {
-        assertThrows(IOException.class, () -> {
+        assertThrows(PythonExecutionException.class, () -> {
             try (PythonEmbed py2 = PythonEmbed.create(
                             PythonEmbed.Options.builder()
                                     .pythonExecutable("/nonexistent/python")
@@ -222,7 +222,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void options_customTimeout_takesEffect() throws Exception {
+    void options_customTimeout_takesEffect() {
         try (PythonEmbed py2 = PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .timeoutMs(60_000)
@@ -233,7 +233,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void options_defaults_workWithoutBuilder() throws Exception {
+    void options_defaults_workWithoutBuilder() {
         try (PythonEmbed py2 = PythonEmbed.create(PythonEmbed.Options.defaults())) {
             assertEquals(42, py2.eval("42").asInt());
         }
@@ -242,8 +242,8 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_withExplicitVenvPath() {
-        // Test that builder with a non-existent venv path throws IOException
-        assertThrows(IOException.class, () -> PythonEmbed.create(
+        // Test that builder with a non-existent venv path throws PythonExecutionException
+        assertThrows(PythonExecutionException.class, () -> PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .venvPath(Path.of("/nonexistent/venv"))
                         .build()));
@@ -253,7 +253,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void ping_healthyProcess_returnsTrue() throws Exception {
+    void ping_healthyProcess_returnsTrue() {
         assertTrue(py.ping(), "ping() should return true for a healthy process");
     }
 
@@ -261,14 +261,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void log_warningLevel_forwardsToSLF4J() throws Exception {
+    void log_warningLevel_forwardsToSLF4J() {
         // Python log forwarding should not throw and should be handled by routeLog
         py.exec("import logging; logging.getLogger('test.logger').warning('test warning message')");
     }
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void log_allLevels_smokeTest() throws Exception {
+    void log_allLevels_smokeTest() {
         py.exec("import logging");
         py.exec("logging.getLogger('test.debug').debug('debug msg')");
         py.exec("logging.getLogger('test.info').info('info msg')");
@@ -278,7 +278,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void log_forwarding_disabledWhenNoBinding() throws Exception {
+    void log_forwarding_disabledWhenNoBinding() {
         boolean original = MsgpackProtocol.LOG_FORWARDING_AVAILABLE;
         try {
             MsgpackProtocol.LOG_FORWARDING_AVAILABLE = false;
@@ -292,7 +292,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void log_forwarding_enabledWhenBindingPresent() throws Exception {
+    void log_forwarding_enabledWhenBindingPresent() {
         assertTrue(MsgpackProtocol.LOG_FORWARDING_AVAILABLE,
                 "Log forwarding should be enabled when SLF4J binding is present");
     }
@@ -301,7 +301,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void health_returnsValidData() throws Exception {
+    void health_returnsValidData() {
         HealthInfo info = py.health();
         assertNotNull(info);
         assertTrue(info.memoryRssKb() >= 0, "memory_rss_kb should be >= 0 (0 on platforms without resource module)");
@@ -312,7 +312,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void health_refCount_increasesWithRef() throws Exception {
+    void health_refCount_increasesWithRef() {
         HealthInfo before = py.health();
         int beforeCount = before.refCount();
 
@@ -327,7 +327,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void health_refCount_decreasesAfterRelease() throws Exception {
+    void health_refCount_decreasesAfterRelease() {
         PythonHandle handle = py.ref("42");
         HealthInfo withRef = py.health();
         int refCount = withRef.refCount();
@@ -339,7 +339,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void health_gcEnabled_returnsTrue() throws Exception {
+    void health_gcEnabled_returnsTrue() {
         HealthInfo info = py.health();
         assertTrue(info.gcEnabled(), "gc should be enabled by default");
     }
@@ -348,7 +348,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void traceback_nameErrorIncludesTraceback() throws Exception {
+    void traceback_nameErrorIncludesTraceback() {
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
                 () -> py.eval("undefined_var")
@@ -362,7 +362,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void traceback_syntaxErrorIncludesTraceback() throws Exception {
+    void traceback_syntaxErrorIncludesTraceback() {
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
                 () -> py.eval("1 + ")
@@ -374,7 +374,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void traceback_getMessageStillContainsFirstLine() throws Exception {
+    void traceback_getMessageStillContainsFirstLine() {
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
                 () -> py.eval("undefined_var")
@@ -390,15 +390,16 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void timeoutOverride_shortTimeout_throwsTimeoutException() throws Exception {
+    void timeoutOverride_shortTimeout_throwsPythonExecutionException() {
         // Use a very short timeout for a long operation
-        assertThrows(TimeoutException.class,
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> py.eval("__import__('time').sleep(10)", 100));
+        assertTrue(ex.getCause() instanceof TimeoutException);
     }
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void timeoutOverride_longTimeout_succeeds() throws Exception {
+    void timeoutOverride_longTimeout_succeeds() {
         // Long timeout allows the sleep to complete
         PythonValue result = py.eval("__import__('time').sleep(0.5) or 42", 5_000);
         assertEquals(42, result.asInt());
@@ -406,7 +407,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void timeoutOverride_zeroTimeout_fallsBackToDefault() throws Exception {
+    void timeoutOverride_zeroTimeout_fallsBackToDefault() {
         // Zero timeout should fall back to default (30s), so this should succeed
         PythonValue result = py.eval("42", 0);
         assertEquals(42, result.asInt());
@@ -414,7 +415,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void timeoutOverride_negativeTimeout_fallsBackToDefault() throws Exception {
+    void timeoutOverride_negativeTimeout_fallsBackToDefault() {
         // Negative timeout should fall back to default
         PythonValue result = py.eval("42", -1);
         assertEquals(42, result.asInt());
@@ -422,7 +423,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void timeoutOverride_exec_withTimeout() throws Exception {
+    void timeoutOverride_exec_withTimeout() {
         // exec should work with timeout override
         py.exec("x = 99", 5_000);
         assertEquals(99, py.eval("x").asInt());
@@ -430,14 +431,15 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void timeoutOverride_exec_shortTimeout_throws() throws Exception {
-        assertThrows(TimeoutException.class,
+    void timeoutOverride_exec_shortTimeout_throws() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
                 () -> py.exec("__import__('time').sleep(10)", 100));
+        assertTrue(ex.getCause() instanceof TimeoutException);
     }
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void timeoutOverride_stream_withTimeout() throws Exception {
+    void timeoutOverride_stream_withTimeout() {
         Iterator<PythonValue> iter = py.stream("range(3)", 5_000);
         assertTrue(iter.hasNext());
         assertEquals(0, iter.next().asInt());
@@ -450,7 +452,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void stream_withDefaultTimeout() throws Exception {
+    void stream_withDefaultTimeout() {
         // Verify default stream works as before
         Iterator<PythonValue> iter = py.stream("[10, 20, 30]");
         assertTrue(iter.hasNext());
@@ -466,7 +468,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchEval_multipleExpressions_returnsAllResults() throws Exception {
+    void batchEval_multipleExpressions_returnsAllResults() {
         List<String> codes = List.of("10 + 20", "3.14 * 2", "'hello'.upper()");
         List<PythonValue> results = py.batchEval(codes);
         assertEquals(3, results.size());
@@ -477,7 +479,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchEval_dependentExpressions_worksSequentially() throws Exception {
+    void batchEval_dependentExpressions_worksSequentially() {
         py.exec("a = 10");
         List<String> codes = List.of("a * 2", "a * 3", "a * 4");
         List<PythonValue> results = py.batchEval(codes);
@@ -489,14 +491,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchEval_emptyList_returnsEmptyResult() throws Exception {
+    void batchEval_emptyList_returnsEmptyResult() {
         List<PythonValue> results = py.batchEval(List.of());
         assertTrue(results.isEmpty());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchEval_errorInMiddle_throwsWithIndex() throws Exception {
+    void batchEval_errorInMiddle_throwsWithIndex() {
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
                 () -> py.batchEval(List.of("1 + 1", "undefined_var", "2 + 2"))
@@ -507,21 +509,21 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchExec_multipleStatements_preservesState() throws Exception {
+    void batchExec_multipleStatements_preservesState() {
         py.batchExec(List.of("x = 10", "y = 20", "z = x + y"));
         assertEquals(30, py.eval("z").asInt());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchExec_emptyList_doesNothing() throws Exception {
+    void batchExec_emptyList_doesNothing() {
         py.batchExec(List.of());
         // Should not throw
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchExec_error_throwsWithIndex() throws Exception {
+    void batchExec_error_throwsWithIndex() {
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
                 () -> py.batchExec(List.of("x = 1", "raise ValueError('test error')", "y = 2"))
@@ -532,14 +534,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchExec_thenEval_stateIsPreserved() throws Exception {
+    void batchExec_thenEval_stateIsPreserved() {
         py.batchExec(List.of("a = 100", "b = 200"));
         assertEquals(300, py.eval("a + b").asInt());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchEval_withTimeoutOverride() throws Exception {
+    void batchEval_withTimeoutOverride() {
         List<PythonValue> results = py.batchEval(List.of("1 + 1", "2 + 2"), 5000);
         assertEquals(2, results.size());
         assertEquals(2, results.get(0).asInt());
@@ -548,7 +550,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void batchExec_withTimeoutOverride() throws Exception {
+    void batchExec_withTimeoutOverride() {
         py.batchExec(List.of("m = 5", "n = 6"), 5000);
         assertEquals(11, py.eval("m + n").asInt());
     }
@@ -557,7 +559,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void warmup_importsModule() throws Exception {
+    void warmup_importsModule() {
         PythonEmbed embed = PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .warmupScript("import math")
@@ -573,7 +575,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void warmup_scriptFailureDoesNotBreakInstance() throws Exception {
+    void warmup_scriptFailureDoesNotBreakInstance() {
         PythonEmbed embed = PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .warmupScript("raise RuntimeError('test warmup error')")
@@ -589,7 +591,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void warmup_explicitMethodCall() throws Exception {
+    void warmup_explicitMethodCall() {
         PythonEmbed embed = PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .venvPath(Path.of("build", "python-venv")).build());
@@ -606,7 +608,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void causeCode_evalErrorIncludesCode() throws Exception {
+    void causeCode_evalErrorIncludesCode() {
         String code = "undefined_var";
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
@@ -618,7 +620,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void causeCode_execErrorIncludesCode() throws Exception {
+    void causeCode_execErrorIncludesCode() {
         String code = "raise ValueError('test')";
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
@@ -630,7 +632,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void causeCode_batchEvalErrorIncludesCode() throws Exception {
+    void causeCode_batchEvalErrorIncludesCode() {
         String failingCode = "1/0";
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
@@ -642,7 +644,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void causeCode_batchExecErrorIncludesCode() throws Exception {
+    void causeCode_batchExecErrorIncludesCode() {
         String failingCode = "raise RuntimeError('batch error')";
         PythonExecutionException ex = assertThrows(
                 PythonExecutionException.class,
@@ -656,14 +658,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_isNull_returnsTrueForNone() throws Exception {
+    void pythonValue_isNull_returnsTrueForNone() {
         PythonValue value = py.eval("None");
         assertTrue(value.isNull());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_isNull_returnsFalseForNonNull() throws Exception {
+    void pythonValue_isNull_returnsFalseForNonNull() {
         PythonValue value = py.eval("42");
         assertFalse(value.isNull());
         assertEquals(42, value.asInt());
@@ -671,7 +673,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_noneToInt_throwsIllegalStateException() throws Exception {
+    void pythonValue_noneToInt_throwsIllegalStateException() {
         PythonValue value = py.eval("None");
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class,
@@ -683,7 +685,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_noneToBoolean_throwsIllegalStateException() throws Exception {
+    void pythonValue_noneToBoolean_throwsIllegalStateException() {
         PythonValue value = py.eval("None");
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class,
@@ -695,7 +697,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_noneToList_throwsIllegalStateException() throws Exception {
+    void pythonValue_noneToList_throwsIllegalStateException() {
         PythonValue value = py.eval("None");
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class,
@@ -706,7 +708,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void pythonValue_noneAsString_returnsNullString() throws Exception {
+    void pythonValue_noneAsString_returnsNullString() {
         PythonValue value = py.eval("None");
         assertEquals("null", value.asString());
     }
@@ -715,7 +717,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void warmup_lenientWarmupDefault_doesNotThrowOnError() throws Exception {
+    void warmup_lenientWarmupDefault_doesNotThrowOnError() {
         // Default lenientWarmup=true: warmup failure should not prevent startup
         PythonEmbed embed = PythonEmbed.create(
                 PythonEmbed.Options.builder()
@@ -734,7 +736,7 @@ class PythonEmbedIntegrationTest {
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void warmup_strictMode_throwsOnError() {
         assertThrows(
-                IOException.class,
+                PythonExecutionException.class,
                 () -> PythonEmbed.create(
                         PythonEmbed.Options.builder()
                                 .warmupScript("raise RuntimeError('warmup error')")
@@ -748,14 +750,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_safeStringLen() throws Exception {
+    void arg_safeStringLen() {
         PythonValue result = py.eval("len(" + PythonEmbed.arg("safe") + ")");
         assertEquals(4, result.asInt());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_safeIntEval() throws Exception {
+    void arg_safeIntEval() {
         PythonValue result = py.eval("[" + PythonEmbed.arg(10) + ", " + PythonEmbed.arg(20) + "]");
         List<Double> list = result.asList(Double.class);
         assertEquals(List.of(10.0, 20.0), list);
@@ -763,7 +765,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_listViaExec() throws Exception {
+    void arg_listViaExec() {
         py.exec("x = " + PythonEmbed.arg(List.of(1, 2, 3)));
         PythonValue result = py.eval("x");
         List<Double> list = result.asList(Double.class);
@@ -772,7 +774,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_mapViaExec() throws Exception {
+    void arg_mapViaExec() {
         py.exec("d = " + PythonEmbed.arg(Map.of("name", "test", "count", 42)));
         PythonValue name = py.eval("d['name']");
         assertEquals("test", name.asString());
@@ -782,7 +784,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_sqlInjection_blocked() throws Exception {
+    void arg_sqlInjection_blocked() {
         // Classic SQL injection pattern should be treated as data, not code
         String malicious = "'; import os; os.system('echo hacked') #";
         String code = "len(" + PythonEmbed.arg(malicious) + ")";
@@ -794,7 +796,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_pythonInjection_blocked() throws Exception {
+    void arg_pythonInjection_blocked() {
         // Python-specific injection: breaking out of a string context
         String malicious = "'); import os; os.system('echo pwned') #";
         String code = "len(" + PythonEmbed.arg(malicious) + ")";
@@ -806,7 +808,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_stringWithSpecialChars_roundtrip() throws Exception {
+    void arg_stringWithSpecialChars_roundtrip() {
         String input = "line1\nline2\tindented\\path'quote";
         py.exec("s = " + PythonEmbed.arg(input));
         PythonValue result = py.eval("s");
@@ -815,14 +817,14 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_emptyString() throws Exception {
+    void arg_emptyString() {
         PythonValue result = py.eval(PythonEmbed.arg(""));
         assertEquals("", result.asString());
     }
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_noneValue() throws Exception {
+    void arg_noneValue() {
         py.exec("v = " + PythonEmbed.arg(null));
         PythonValue result = py.eval("v is None");
         assertTrue(result.asBoolean());
@@ -830,7 +832,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_boolValues() throws Exception {
+    void arg_boolValues() {
         py.exec("t = " + PythonEmbed.arg(true));
         py.exec("f = " + PythonEmbed.arg(false));
         assertTrue(py.eval("t").asBoolean());
@@ -839,7 +841,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_doubleSpecialValues() throws Exception {
+    void arg_doubleSpecialValues() {
         py.exec("nan = " + PythonEmbed.arg(Double.NaN));
         py.exec("inf = " + PythonEmbed.arg(Double.POSITIVE_INFINITY));
         py.exec("ninf = " + PythonEmbed.arg(Double.NEGATIVE_INFINITY));
@@ -852,7 +854,7 @@ class PythonEmbedIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void arg_nestedCollections() throws Exception {
+    void arg_nestedCollections() {
         py.exec("data = " + PythonEmbed.arg(
                 List.of(Map.of("name", "alice", "scores", List.of(90, 85, 95)))));
         PythonValue name = py.eval("data[0]['name']");

@@ -6,13 +6,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.lang.reflect.UndeclaredThrowableException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for {@link PythonEmbed#proxy} and
@@ -44,7 +45,7 @@ class PythonEmbedProxyTest {
     private static PythonEmbed py;
 
     @BeforeAll
-    static void setUp() throws Exception {
+    static void setUp() {
         py = PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .venvPath(Path.of("build", "python-venv")).build());
@@ -56,7 +57,7 @@ class PythonEmbedProxyTest {
     }
 
     @BeforeEach
-    void clearState() throws Exception {
+    void clearState() {
         py.exec("globals().clear()");
     }
 
@@ -64,7 +65,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_basicMethodCall() throws Exception {
+    void proxy_basicMethodCall() {
         py.exec("""
                 class Calc:
                     def add(self, a, b):
@@ -88,7 +89,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_stringResult() throws Exception {
+    void proxy_stringResult() {
         py.exec("""
                 class Proc:
                     def process(self, s):
@@ -106,7 +107,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_listResult() throws Exception {
+    void proxy_listResult() {
         py.exec("""
                 class DS:
                     def get_values(self):
@@ -128,7 +129,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_mapResult() throws Exception {
+    void proxy_mapResult() {
         py.exec("""
                 class DS:
                     def get_metadata(self):
@@ -150,7 +151,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_voidMethod() throws Exception {
+    void proxy_voidMethod() {
         py.exec("""
                 class Proc:
                     def __init__(self):
@@ -173,7 +174,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_snakeCaseConversion() throws Exception {
+    void proxy_snakeCaseConversion() {
         py.exec("""
                 class Calc:
                     def calculate_sum(self, a, b):
@@ -196,7 +197,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_exactMatchPreferred() throws Exception {
+    void proxy_exactMatchPreferred() {
         py.exec("""
                 class Calc:
                     def calculateSum(self, a, b):
@@ -223,7 +224,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_exceptionPropagation() throws Exception {
+    void proxy_exceptionPropagation() {
         py.exec("""
                 class Calc:
                     def add(self, a, b):
@@ -233,13 +234,11 @@ class PythonEmbedProxyTest {
         PythonHandle handle = py.ref("calc");
         try {
             Calculator calc = py.proxy(handle.refId(), Calculator.class);
-            UndeclaredThrowableException ex = assertThrows(
-                    UndeclaredThrowableException.class,
+            PythonExecutionException ex = assertThrows(
+                    PythonExecutionException.class,
                     () -> calc.add(1, 2));
-            Throwable cause = ex.getCause();
-            assertTrue(cause instanceof PythonExecutionException);
-            assertTrue(cause.getMessage().contains("ValueError"));
-            assertTrue(cause.getMessage().contains("Bad values!"));
+            assertTrue(ex.getMessage().contains("ValueError"));
+            assertTrue(ex.getMessage().contains("Bad values!"));
         } finally {
             handle.release();
         }
@@ -247,7 +246,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_methodNotFound() throws Exception {
+    void proxy_methodNotFound() {
         py.exec("""
                 class Calc:
                     pass
@@ -256,12 +255,10 @@ class PythonEmbedProxyTest {
         PythonHandle handle = py.ref("calc");
         try {
             Calculator calc = py.proxy(handle.refId(), Calculator.class);
-            UndeclaredThrowableException ex = assertThrows(
-                    UndeclaredThrowableException.class,
+            PythonExecutionException ex = assertThrows(
+                    PythonExecutionException.class,
                     () -> calc.add(1, 2));
-            Throwable cause = ex.getCause();
-            assertTrue(cause instanceof PythonExecutionException);
-            assertTrue(cause.getMessage().contains("AttributeError"));
+            assertTrue(ex.getMessage().contains("AttributeError"));
         } finally {
             handle.release();
         }
@@ -271,7 +268,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_toString_local() throws Exception {
+    void proxy_toString_local() {
         py.exec("x = 42");
         PythonHandle handle = py.ref("x");
         try {
@@ -286,7 +283,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_hashCode_local() throws Exception {
+    void proxy_hashCode_local() {
         py.exec("x = 42");
         PythonHandle handle = py.ref("x");
         try {
@@ -303,7 +300,7 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_getterUsesGetAttr() throws Exception {
+    void proxy_getterUsesGetAttr() {
         py.exec("""
                 class DS:
                     def __init__(self):
@@ -328,14 +325,12 @@ class PythonEmbedProxyTest {
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
-    void proxy_invalidRefId() throws Exception {
+    void proxy_invalidRefId() {
         Calculator calc = py.proxy(99999, Calculator.class);
-        UndeclaredThrowableException ex = assertThrows(
-                UndeclaredThrowableException.class,
+        PythonExecutionException ex = assertThrows(
+                PythonExecutionException.class,
                 () -> calc.add(1, 2));
-        Throwable cause = ex.getCause();
-        assertTrue(cause instanceof PythonExecutionException);
-        assertTrue(cause.getMessage().contains("Invalid ref_id"));
+        assertTrue(ex.getMessage().contains("Invalid ref_id"));
     }
 
     // ---- not an interface ----

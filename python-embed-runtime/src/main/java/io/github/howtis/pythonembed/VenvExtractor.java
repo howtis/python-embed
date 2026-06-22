@@ -1,7 +1,6 @@
 package io.github.howtis.pythonembed;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileSystem;
@@ -54,7 +53,7 @@ class VenvExtractor implements AutoCloseable {
         String scheme = uri.getScheme();
 
         if ("jar".equals(scheme)) {
-            extractFromJar(uri, resourcePath);
+            extractFromJar(uri);
         } else {
             // Filesystem (IDE/dev mode)
             Path sourceDir = Path.of(uri);
@@ -75,7 +74,7 @@ class VenvExtractor implements AutoCloseable {
 
     // ---- internal ----
 
-    private void extractFromJar(URI jarUri, String resourcePath) throws IOException {
+    private void extractFromJar(URI jarUri) throws IOException {
         // The URI looks like: jar:file:/path/to.jar!/resourcePath
         String[] parts = jarUri.toString().split("!");
         if (parts.length < 2) {
@@ -118,9 +117,8 @@ class VenvExtractor implements AutoCloseable {
 
     private void cleanupTempDir() {
         if (tempDir != null && Files.exists(tempDir)) {
-            try {
-                Files.walk(tempDir)
-                        .sorted(Comparator.reverseOrder())
+            try (var walk = Files.walk(tempDir)) {
+                walk.sorted(Comparator.reverseOrder())
                         .forEach(path -> {
                             try {
                                 Files.deleteIfExists(path);

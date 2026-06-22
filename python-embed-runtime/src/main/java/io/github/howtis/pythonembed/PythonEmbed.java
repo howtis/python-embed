@@ -3,15 +3,14 @@ package io.github.howtis.pythonembed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Collection;
-import java.util.Iterator;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -116,12 +115,16 @@ public class PythonEmbed implements AutoCloseable {
      *
      * @param options consolidated configuration (venv path, env, timeouts, etc.)
      * @return a ready-to-use PythonEmbed instance
-     * @throws IOException if venv extraction or process startup fails
+     * @throws PythonExecutionException if venv extraction or process startup fails
      */
-    public static PythonEmbed create(Options options) throws IOException {
-        PythonEmbed embed = new PythonEmbed(options);
-        embed.initialize();
-        return embed;
+    public static PythonEmbed create(Options options) {
+        try {
+            PythonEmbed embed = new PythonEmbed(options);
+            embed.initialize();
+            return embed;
+        } catch (IOException e) {
+            throw PythonExecutionException.wrap("create", e);
+        }
     }
 
     private void initialize() throws IOException {
@@ -148,7 +151,7 @@ public class PythonEmbed implements AutoCloseable {
 
         // Ensure the Python process is killed on JVM exit
         processCleanupHook = new Thread(
-                () -> processManager.hardShutdown(),
+                processManager::hardShutdown,
                 "python-process-cleanup");
         Runtime.getRuntime().addShutdownHook(processCleanupHook);
 
@@ -230,7 +233,7 @@ public class PythonEmbed implements AutoCloseable {
      * (not embedded in JAR). Returns {@code null} if the venv is embedded
      * or properties are missing.
      */
-    private Path resolveFromProperties(Properties props) throws IOException {
+    private Path resolveFromProperties(Properties props) {
         if (props == null) {
             return null;
         }
@@ -288,13 +291,15 @@ public class PythonEmbed implements AutoCloseable {
      *
      * @param code Python expression to evaluate
      * @return the result wrapped in PythonValue
-     * @throws PythonExecutionException if Python evaluation fails
-     * @throws TimeoutException if evaluation exceeds the configured timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if Python evaluation fails,
+     *         communication with the Python process fails, or the request times out
      */
-    public PythonValue eval(String code)
-            throws PythonExecutionException, TimeoutException, IOException {
-        return protocol.sendEval(writer, code);
+    public PythonValue eval(String code) {
+        try {
+            return protocol.sendEval(writer, code);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("eval", e);
+        }
     }
 
     /**
@@ -304,13 +309,15 @@ public class PythonEmbed implements AutoCloseable {
      * @param timeoutMs timeout in milliseconds for this call;
      *                  when &lt;= 0, uses the configured default timeout
      * @return the result wrapped in PythonValue
-     * @throws PythonExecutionException if Python evaluation fails
-     * @throws TimeoutException if evaluation exceeds the timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if Python evaluation fails,
+     *         communication with the Python process fails, or the request times out
      */
-    public PythonValue eval(String code, long timeoutMs)
-            throws PythonExecutionException, TimeoutException, IOException {
-        return protocol.sendEval(writer, code, timeoutMs);
+    public PythonValue eval(String code, long timeoutMs) {
+        try {
+            return protocol.sendEval(writer, code, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("eval", e);
+        }
     }
 
     /**
@@ -318,13 +325,15 @@ public class PythonEmbed implements AutoCloseable {
      * State is preserved across calls (shared namespace).
      *
      * @param code Python statements to execute
-     * @throws PythonExecutionException if Python execution fails
-     * @throws TimeoutException if execution exceeds the configured timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
      */
-    public void exec(String code)
-            throws PythonExecutionException, TimeoutException, IOException {
-        protocol.sendExec(writer, code);
+    public void exec(String code) {
+        try {
+            protocol.sendExec(writer, code);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("exec", e);
+        }
     }
 
     /**
@@ -333,26 +342,30 @@ public class PythonEmbed implements AutoCloseable {
      * @param code Python statements to execute
      * @param timeoutMs timeout in milliseconds for this call;
      *                  when &lt;= 0, uses the configured default timeout
-     * @throws PythonExecutionException if Python execution fails
-     * @throws TimeoutException if execution exceeds the timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
      */
-    public void exec(String code, long timeoutMs)
-            throws PythonExecutionException, TimeoutException, IOException {
-        protocol.sendExec(writer, code, timeoutMs);
+    public void exec(String code, long timeoutMs) {
+        try {
+            protocol.sendExec(writer, code, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("exec", e);
+        }
     }
 
     /**
      * Executes a warmup script on an already-running Python instance.
      *
      * @param script Python code to execute (typically import statements)
-     * @throws PythonExecutionException if Python execution fails
-     * @throws TimeoutException if execution exceeds the configured timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
      */
-    public void warmup(String script)
-            throws PythonExecutionException, TimeoutException, IOException {
-        protocol.sendExec(writer, script, options.timeoutMs());
+    public void warmup(String script) {
+        try {
+            protocol.sendExec(writer, script, options.timeoutMs());
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("warmup", e);
+        }
     }
 
     /**
@@ -364,12 +377,10 @@ public class PythonEmbed implements AutoCloseable {
      *
      * @param codes Python expressions to evaluate
      * @return a list of results, one per expression, in the same order
-     * @throws PythonExecutionException if any expression fails
-     * @throws TimeoutException if the batch exceeds the configured timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if any expression fails,
+     *         communication with the Python process fails, or the batch times out
      */
-    public List<PythonValue> batchEval(List<String> codes)
-            throws PythonExecutionException, TimeoutException, IOException {
+    public List<PythonValue> batchEval(List<String> codes) {
         return batchEval(codes, 0);
     }
 
@@ -381,13 +392,15 @@ public class PythonEmbed implements AutoCloseable {
      * @param timeoutMs timeout in milliseconds for the entire batch;
      *                  when &lt;= 0, uses the configured default timeout
      * @return a list of results, one per expression, in the same order
-     * @throws PythonExecutionException if any expression fails
-     * @throws TimeoutException if the batch exceeds the timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if any expression fails,
+     *         communication with the Python process fails, or the batch times out
      */
-    public List<PythonValue> batchEval(List<String> codes, long timeoutMs)
-            throws PythonExecutionException, TimeoutException, IOException {
-        return protocol.sendBatchEval(writer, codes, timeoutMs);
+    public List<PythonValue> batchEval(List<String> codes, long timeoutMs) {
+        try {
+            return protocol.sendBatchEval(writer, codes, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("batchEval", e);
+        }
     }
 
     /**
@@ -397,12 +410,10 @@ public class PythonEmbed implements AutoCloseable {
      * <p>Statements are executed sequentially in the shared namespace.
      *
      * @param codes Python statements to execute
-     * @throws PythonExecutionException if any statement fails
-     * @throws TimeoutException if the batch exceeds the configured timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if any statement fails,
+     *         communication with the Python process fails, or the batch times out
      */
-    public void batchExec(List<String> codes)
-            throws PythonExecutionException, TimeoutException, IOException {
+    public void batchExec(List<String> codes) {
         batchExec(codes, 0);
     }
 
@@ -413,13 +424,15 @@ public class PythonEmbed implements AutoCloseable {
      * @param codes Python statements to execute
      * @param timeoutMs timeout in milliseconds for the entire batch;
      *                  when &lt;= 0, uses the configured default timeout
-     * @throws PythonExecutionException if any statement fails
-     * @throws TimeoutException if the batch exceeds the timeout
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if any statement fails,
+     *         communication with the Python process fails, or the batch times out
      */
-    public void batchExec(List<String> codes, long timeoutMs)
-            throws PythonExecutionException, TimeoutException, IOException {
-        protocol.sendBatchExec(writer, codes, timeoutMs);
+    public void batchExec(List<String> codes, long timeoutMs) {
+        try {
+            protocol.sendBatchExec(writer, codes, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("batchExec", e);
+        }
     }
 
     /**
@@ -428,19 +441,20 @@ public class PythonEmbed implements AutoCloseable {
      *
      * @param variableName the name of an existing Python variable
      * @return a handle that can be used for method calls and attribute access
-     * @throws PythonExecutionException if the variable doesn't exist
-     * @throws TimeoutException if the request times out
-     * @throws IOException if communication with Python process fails
+     * @throws PythonExecutionException if the variable doesn't exist,
+     *         communication with the Python process fails, or the request times out
      */
-    public PythonHandle ref(String variableName)
-            throws PythonExecutionException, TimeoutException, IOException {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> refInfo = protocol.sendRef(writer, variableName);
-        int refId = ((Number) refInfo.get("ref_id")).intValue();
-        String type = (String) refInfo.get("type");
-        PythonHandle handle = new PythonHandle(this, protocol, writer, refId, type);
-        handles.add(handle);
-        return handle;
+    public PythonHandle ref(String variableName) {
+        try {
+            Map<String, Object> refInfo = protocol.sendRef(writer, variableName);
+            int refId = ((Number) refInfo.get("ref_id")).intValue();
+            String type = (String) refInfo.get("type");
+            PythonHandle handle = new PythonHandle(this, protocol, writer, refId, type);
+            handles.add(handle);
+            return handle;
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("ref", e);
+        }
     }
 
     /**
@@ -501,13 +515,10 @@ public class PythonEmbed implements AutoCloseable {
      * @param interfaceClass the Java interface to proxy
      * @return a dynamic proxy implementing the given interface
      * @throws PythonExecutionException if ref resolution fails
-     * @throws IOException if the Python process is unavailable
-     * @throws TimeoutException if the operation times out
      * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
      */
     @SuppressWarnings("unchecked")
-    public <T> T proxy(String variableName, Class<T> interfaceClass)
-            throws PythonExecutionException, TimeoutException, IOException {
+    public <T> T proxy(String variableName, Class<T> interfaceClass) {
         if (!interfaceClass.isInterface()) {
             throw new IllegalArgumentException(
                     "proxy() requires an interface, got: " + interfaceClass.getName());
@@ -531,10 +542,14 @@ public class PythonEmbed implements AutoCloseable {
      *
      * @param code a Python expression that evaluates to an iterable
      * @return an iterator over the streamed values
-     * @throws IOException if the stream request fails
+     * @throws PythonExecutionException if the stream request fails
      */
-    public Iterator<PythonValue> stream(String code) throws IOException {
-        return protocol.sendStream(writer, code);
+    public Iterator<PythonValue> stream(String code) {
+        try {
+            return protocol.sendStream(writer, code);
+        } catch (IOException e) {
+            throw PythonExecutionException.wrap("stream", e);
+        }
     }
 
     /**
@@ -544,10 +559,14 @@ public class PythonEmbed implements AutoCloseable {
      * @param timeoutMs timeout in milliseconds per poll;
      *                  when &lt;= 0, uses the configured default timeout
      * @return an iterator over the streamed values
-     * @throws IOException if the stream request fails
+     * @throws PythonExecutionException if the stream request fails
      */
-    public Iterator<PythonValue> stream(String code, long timeoutMs) throws IOException {
-        return protocol.sendStream(writer, code, timeoutMs);
+    public Iterator<PythonValue> stream(String code, long timeoutMs) {
+        try {
+            return protocol.sendStream(writer, code, timeoutMs);
+        } catch (IOException e) {
+            throw PythonExecutionException.wrap("stream", e);
+        }
     }
 
     /**
@@ -556,10 +575,14 @@ public class PythonEmbed implements AutoCloseable {
      * <p>Sends a ping request and waits for a pong response.
      *
      * @return true if the Python process is healthy and responded
-     * @throws IOException if an I/O error occurs writing to the process
+     * @throws PythonExecutionException if an I/O error occurs
      */
-    public boolean ping() throws IOException {
-        return protocol.sendPing(writer);
+    public boolean ping() {
+        try {
+            return protocol.sendPing(writer);
+        } catch (IOException e) {
+            throw PythonExecutionException.wrap("ping", e);
+        }
     }
 
     /**
@@ -569,12 +592,15 @@ public class PythonEmbed implements AutoCloseable {
      * GC generation counts.
      *
      * @return health data collected from the Python process
-     * @throws PythonExecutionException if the Python process returns an error
-     * @throws TimeoutException if the request times out
-     * @throws IOException if an I/O error occurs
+     * @throws PythonExecutionException if the Python process returns an error,
+     *         communication fails, or the request times out
      */
-    public HealthInfo health() throws PythonExecutionException, TimeoutException, IOException {
-        return protocol.sendHealth(writer);
+    public HealthInfo health() {
+        try {
+            return protocol.sendHealth(writer);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("health", e);
+        }
     }
 
     void forgetHandle(PythonHandle handle) {

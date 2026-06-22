@@ -88,10 +88,9 @@ public class PythonValue {
     @SuppressWarnings("unchecked")
     public <T> List<T> asList(Class<T> type) {
         checkNotNull("List");
-        if (!(raw instanceof List)) {
+        if (!( raw instanceof List<?> rawList )) {
             throw new ClassCastException("Cannot convert " + className() + " to List");
         }
-        List<?> rawList = (List<?>) raw;
         if (type == Object.class) {
             return (List<T>) rawList;
         }
@@ -106,10 +105,9 @@ public class PythonValue {
     @SuppressWarnings("unchecked")
     public <K, V> Map<K, V> asMap(Class<K> keyType, Class<V> valueType) {
         checkNotNull("Map");
-        if (!(raw instanceof Map)) {
+        if (!( raw instanceof Map<?, ?> rawMap )) {
             throw new ClassCastException("Cannot convert " + className() + " to Map");
         }
-        Map<?, ?> rawMap = (Map<?, ?>) raw;
         if (keyType == Object.class && valueType == Object.class) {
             return (Map<K, V>) rawMap;
         }
