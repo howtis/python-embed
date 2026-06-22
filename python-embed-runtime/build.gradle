@@ -17,12 +17,6 @@ test {
 
 pythonEmbed {
     packages = [
-        'msgpack',
-        'numpy',
-        'pandas',
-        'scipy',
-        'requests',
-        'pyyaml',
-        'python-dateutil'
+        'msgpack'
     ]
 }
