@@ -226,7 +226,7 @@ class PythonProcessManager {
             while (running) {
                 // Read 4-byte big-endian length
                 byte[] lenBuf = new byte[4];
-                int read = readExact(stdoutStream, lenBuf, 0, 4);
+                int read = stdoutStream.readNBytes(lenBuf, 0, 4);
                 if (read < 4) {
                     break; // EOF
                 }
@@ -241,7 +241,7 @@ class PythonProcessManager {
                 }
 
                 byte[] data = new byte[length];
-                read = readExact(stdoutStream, data, 0, length);
+                read = stdoutStream.readNBytes(data, 0, length);
                 if (read < length) {
                     logger.warning("Incomplete frame: expected " + length + " bytes, got " + read);
                     break;
@@ -289,17 +289,6 @@ class PythonProcessManager {
         }
     }
 
-    private static int readExact(InputStream in, byte[] buf, int off, int len) throws IOException {
-        int total = 0;
-        while (total < len) {
-            int r = in.read(buf, off + total, len - total);
-            if (r < 0) {
-                break;
-            }
-            total += r;
-        }
-        return total;
-    }
 
     /**
      * Resolves the Python executable within a directory.

@@ -961,63 +961,29 @@ public class PythonEmbed implements AutoCloseable {
      *         .build();
      * try (PythonEmbed py = PythonEmbed.create(opts)) { ... }
      * }</pre>
+     *
+     * @param timeoutMs        Per-request timeout in milliseconds (default: 30_000)
+     * @param maxCodeLength    Maximum code length in characters (default: 100_000)
+     * @param startupTimeoutMs Startup timeout in milliseconds (default: 30_000)
+     * @param pythonExecutable Python executable override, or null for auto-detect
+     * @param warmupScripts    Warmup scripts to execute after instance initialization
+     * @param lenientWarmup    Whether warmup script failures should be logged as warnings
+     *                         instead of throwing exceptions. Default is {@code true}
+     *                         (backward-compatible; failures are logged but do not prevent startup).
+     *                         Set to {@code false} to make warmup failures immediately visible
+     * @param venvPath         Explicit venv path, or null for auto-discovery / classpath extraction
+     * @param env              Environment variables to pass to the Python process (never null)
      */
-    public static final class Options {
-        private final long timeoutMs;
-        private final int maxCodeLength;
-        private final long startupTimeoutMs;
-        private final String pythonExecutable;
-        private final List<String> warmupScripts;
-        private final boolean lenientWarmup;
-        private final Path venvPath;
-        private final Map<String, String> env;
-
-        private Options(long timeoutMs,
-                        int maxCodeLength, long startupTimeoutMs,
-                        String pythonExecutable,
-                        List<String> warmupScripts,
-                        boolean lenientWarmup,
-                        Path venvPath,
-                        Map<String, String> env) {
-            this.timeoutMs = timeoutMs;
-            this.maxCodeLength = maxCodeLength;
-            this.startupTimeoutMs = startupTimeoutMs;
-            this.pythonExecutable = pythonExecutable;
-            this.warmupScripts = warmupScripts;
-            this.lenientWarmup = lenientWarmup;
-            this.venvPath = venvPath;
-            this.env = env;
-        }
-
-        /** Per-request timeout in milliseconds (default: 30_000). */
-        public long timeoutMs() { return timeoutMs; }
-
-        /** Maximum code length in characters (default: 100_000). */
-        public int maxCodeLength() { return maxCodeLength; }
-
-        /** Startup timeout in milliseconds (default: 30_000). */
-        public long startupTimeoutMs() { return startupTimeoutMs; }
-
-        /** Python executable override, or null for auto-detect. */
-        public String pythonExecutable() { return pythonExecutable; }
-
-        /** Warmup scripts to execute after instance initialization. */
-        public List<String> warmupScripts() { return warmupScripts; }
-
-        /**
-         * Whether warmup script failures should be logged as warnings
-         * instead of throwing exceptions. Default is {@code true}
-         * (backward-compatible; failures are logged but do not prevent startup).
-         * Set to {@code false} to make warmup failures immediately visible.
-         */
-        public boolean lenientWarmup() { return lenientWarmup; }
-
-        /** Explicit venv path, or null for auto-discovery / classpath extraction. */
-        public Path venvPath() { return venvPath; }
-
-        /** Environment variables to pass to the Python process (never null). */
-        public Map<String, String> env() { return env; }
-
+    public record Options(
+            long timeoutMs,
+            int maxCodeLength,
+            long startupTimeoutMs,
+            String pythonExecutable,
+            List<String> warmupScripts,
+            boolean lenientWarmup,
+            Path venvPath,
+            Map<String, String> env
+    ) {
         static Options defaults() {
             return new Options(30_000, 100_000, 30_000, null, Collections.emptyList(), true,
                     null, Collections.emptyMap());

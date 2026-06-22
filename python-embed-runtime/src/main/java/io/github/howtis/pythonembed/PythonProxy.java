@@ -50,7 +50,7 @@ class PythonProxy implements InvocationHandler {
     }
 
     /**
-     * Core invocation logic shared with {@link PythonPoolProxy}.
+     * Core invocation logic.
      * Routes a Java interface method call to the Python object.
      */
     Object invokePython(Method method, Object[] args) throws Throwable {

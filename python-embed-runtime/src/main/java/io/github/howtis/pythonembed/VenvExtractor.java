@@ -1,15 +1,13 @@
 package io.github.howtis.pythonembed;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.logging.Level;
@@ -94,25 +92,21 @@ class VenvExtractor implements AutoCloseable {
     }
 
     private void copyDirectory(Path source, Path target) throws IOException {
-        Files.walkFileTree(source, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException {
-                Path relativePath = source.relativize(dir);
-                Path targetDir = target.resolve(relativePath.toString());
-                Files.createDirectories(targetDir);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                    throws IOException {
-                Path relativePath = source.relativize(file);
-                Path targetFile = target.resolve(relativePath.toString());
-                Files.copy(file, targetFile);
-                return FileVisitResult.CONTINUE;
-            }
-        });
+        try (var files = Files.walk(source)) {
+            files.forEach(file -> {
+                try {
+                    Path relative = source.relativize(file);
+                    Path dest = target.resolve(relative.toString());
+                    if (Files.isDirectory(file)) {
+                        Files.createDirectories(dest);
+                    } else {
+                        Files.copy(file, dest);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        }
     }
 
     private void cleanupTempDir() {

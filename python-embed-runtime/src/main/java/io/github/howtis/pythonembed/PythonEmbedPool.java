@@ -534,11 +534,24 @@ public class PythonEmbedPool implements AutoCloseable {
             throw new IllegalArgumentException(
                     "proxy() requires an interface, got: " + interfaceClass.getName());
         }
-        PythonPoolProxy handler = new PythonPoolProxy(this, refId);
         return (T) java.lang.reflect.Proxy.newProxyInstance(
                 interfaceClass.getClassLoader(),
                 new Class<?>[]{interfaceClass},
-                handler);
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return method.invoke(this, args);
+                    }
+                    PooledInstance pi = acquireInstance();
+                    try {
+                        PythonEmbed embed = pi.embed;
+                        return new PythonProxy(
+                                embed.protocol, embed.writer, refId,
+                                embed.options.timeoutMs())
+                                .invokePython(method, args);
+                    } finally {
+                        releaseInstance(pi);
+                    }
+                });
     }
 
     /**
