@@ -555,6 +555,42 @@ class PythonEmbedIntegrationTest {
         assertEquals(11, py.eval("m + n").asInt());
     }
 
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void batchEval_timeoutZero_usesDefault() {
+        // timeoutMs <= 0 falls back to configured default timeout
+        List<PythonValue> results = py.batchEval(List.of("5 * 5", "10 + 3"), 0);
+        assertEquals(2, results.size());
+        assertEquals(25, results.get(0).asInt());
+        assertEquals(13, results.get(1).asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void batchEval_timeoutNegative_usesDefault() {
+        // Negative timeout falls back to configured default
+        List<PythonValue> results = py.batchEval(List.of("7 + 3", "2 * 9"), -1);
+        assertEquals(2, results.size());
+        assertEquals(10, results.get(0).asInt());
+        assertEquals(18, results.get(1).asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void batchExec_timeoutZero_usesDefault() {
+        // timeoutMs <= 0 falls back to configured default timeout
+        py.batchExec(List.of("p = 3", "q = 7"), 0);
+        assertEquals(10, py.eval("p + q").asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void batchExec_timeoutNegative_usesDefault() {
+        // Negative timeout falls back to configured default
+        py.batchExec(List.of("r = 8", "s = 9"), -1);
+        assertEquals(17, py.eval("r + s").asInt());
+    }
+
     // ---- Warmup tests ----
 
     @Test

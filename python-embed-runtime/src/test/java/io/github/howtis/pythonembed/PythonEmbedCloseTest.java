@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -196,6 +197,44 @@ class PythonEmbedCloseTest {
 
         assertDoesNotThrow(() -> embed.close(),
                 "Default close() should succeed");
+        assertNull(getField(embed, "processCleanupHook"));
+    }
+
+    @Test
+    void close_timeoutNegative_usesDefault() {
+        // Negative timeout: waitMs = -1, forceWaitMs = min(-1, 2000) = -1
+        // closeInternal handles negative values gracefully via processManager.close()
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        assertDoesNotThrow(() -> embed.close(-1, TimeUnit.MILLISECONDS),
+                "close() with negative timeout should not throw");
+        assertNull(getField(embed, "processCleanupHook"));
+    }
+
+    @Test
+    void close_timeoutZero_usesDefault() {
+        // Zero timeout: waitMs = 0, forceWaitMs = min(0, 2000) = 0
+        // Zero timeouts mean immediate fall-through in processManager.close()
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        assertDoesNotThrow(() -> embed.close(0, TimeUnit.MILLISECONDS),
+                "close() with zero timeout should not throw");
+        assertNull(getField(embed, "processCleanupHook"));
+    }
+
+    @Test
+    void close_largeTimeout_gracefulShutdown() {
+        // Large timeout: waitMs is large, forceWaitMs = min(large/2, 2000) = 2000
+        Thread hook = new Thread(() -> {}, "python-process-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
+        setField(embed, "processCleanupHook", hook);
+
+        assertDoesNotThrow(() -> embed.close(60_000, TimeUnit.MILLISECONDS),
+                "close() with large timeout should not throw");
         assertNull(getField(embed, "processCleanupHook"));
     }
 

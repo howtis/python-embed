@@ -291,6 +291,31 @@ class PythonProcessManagerTest {
         assertEquals(2, baos.toByteArray()[1]);
     }
 
+    @Test
+    void stdinWriter_autoFlushesAfterWrite() throws Exception {
+        // stdinWriter is configured with autoFlush=true:
+        // every write() is immediately followed by flush()
+        PythonProcessManager mgr = new PythonProcessManager(dummyProtocol);
+        AtomicInteger flushCount = new AtomicInteger(0);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream() {
+            @Override
+            public void flush() throws IOException {
+                flushCount.incrementAndGet();
+                super.flush();
+            }
+        };
+        setField(mgr, "running", true);
+        setField(mgr, "stdinStream", baos);
+
+        PythonProtocol.Writer writer = mgr.stdinWriter();
+        writer.write(new byte[]{1, 2, 3});
+        writer.write(new byte[]{4, 5});
+
+        assertEquals(2, flushCount.get(),
+                "flush() should be called once per write (autoFlush)");
+        assertArrayEquals(new byte[]{1, 2, 3, 4, 5}, baos.toByteArray());
+    }
+
     // ------------------------------------------------------------------
     // close() - default timeouts
     // ------------------------------------------------------------------
