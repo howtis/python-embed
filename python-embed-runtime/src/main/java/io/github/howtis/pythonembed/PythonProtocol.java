@@ -199,7 +199,7 @@ abstract class PythonProtocol {
 
         Response response = awaitResponse(id, future, "eval");
         if (response.isError()) {
-            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, code);
+            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, code, response.errorType());
         }
         return PythonValue.of(response.value);
     }
@@ -291,7 +291,7 @@ abstract class PythonProtocol {
                 throw new PythonExecutionException(
                         "batchEval[" + i + "]: " + extractErrorMessage(response.message()),
                         response.message(),
-                        failingCode);
+                        failingCode, response.errorType());
             }
             results.add(PythonValue.of(response.value()));
         }
@@ -318,7 +318,7 @@ abstract class PythonProtocol {
                 throw new PythonExecutionException(
                         "batchExec[" + i + "]: " + extractErrorMessage(response.message()),
                         response.message(),
-                        failingCode);
+                        failingCode, response.errorType());
             }
         }
     }
@@ -346,7 +346,7 @@ abstract class PythonProtocol {
 
         Response response = awaitResponse(id, future, "exec");
         if (response.isError()) {
-            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, code);
+            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, code, response.errorType());
         }
     }
 
@@ -405,7 +405,7 @@ abstract class PythonProtocol {
 
         Response response = awaitResponse(id, future, "health");
         if (response.isError()) {
-            throw new PythonExecutionException(extractErrorMessage(response.message), response.message);
+            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, null, response.errorType());
         }
         Map<String, Object> data = (Map<String, Object>) response.value;
         return new HealthInfo(
@@ -430,7 +430,7 @@ abstract class PythonProtocol {
 
         Response response = awaitResponse(id, future, "ref");
         if (response.isError()) {
-            throw new PythonExecutionException(extractErrorMessage(response.message), response.message);
+            throw new PythonExecutionException(extractErrorMessage(response.message), response.message, null, response.errorType());
         }
         return (Map<String, Object>) response.value;
     }
@@ -462,7 +462,7 @@ abstract class PythonProtocol {
         Response response = awaitResponse(id, future, "call");
         if (response.isError()) {
             throw new PythonExecutionException(extractErrorMessage(response.message), response.message,
-                    "call(refId=" + refId + ", method=" + method + ")");
+                    "call(refId=" + refId + ", method=" + method + ")", response.errorType());
         }
         return PythonValue.of(response.value);
     }
@@ -481,7 +481,7 @@ abstract class PythonProtocol {
         Response response = awaitResponse(id, future, "getattr");
         if (response.isError()) {
             throw new PythonExecutionException(extractErrorMessage(response.message), response.message,
-                    "getattr(refId=" + refId + ", name=" + name + ")");
+                    "getattr(refId=" + refId + ", name=" + name + ")", response.errorType());
         }
         return PythonValue.of(response.value);
     }
@@ -596,7 +596,7 @@ abstract class PythonProtocol {
     /**
      * Internal response record.
      */
-    record Response(int id, String type, Object value, String message) {
+    record Response(int id, String type, Object value, String message, String errorType) {
         boolean isError() {
             return "error".equals(type);
         }

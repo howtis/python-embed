@@ -275,7 +275,7 @@ def handle_stream_binary(request, stdout_buf):
             })
         write_frame(stdout_buf, {"id": req_id, "type": "stream_end"})
     except Exception as e:
-        write_frame(stdout_buf, make_error(req_id, format_error(e)))
+        write_frame(stdout_buf, make_error(req_id, *format_error(e)))
 
 
 def handle_batch(request):
@@ -301,14 +301,14 @@ def handle_batch(request):
                 result = eval(code, namespace)
                 write_frame(stdout_buf, make_result(item_id, result))
             except Exception as e:
-                write_frame(stdout_buf, make_error(item_id, format_error(e)))
+                write_frame(stdout_buf, make_error(item_id, *format_error(e)))
 
         elif item_type == "exec":
             try:
                 exec(code, namespace)
                 write_frame(stdout_buf, make_result(item_id, None))
             except Exception as e:
-                write_frame(stdout_buf, make_error(item_id, format_error(e)))
+                write_frame(stdout_buf, make_error(item_id, *format_error(e)))
 
         else:
             write_frame(stdout_buf, make_error(item_id, f"Unknown batch item type: {item_type}"))
@@ -341,42 +341,42 @@ def handle_request(request):
                 result = eval(code, namespace)
                 return True, make_result(req_id, result)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "exec":
             try:
                 exec(code, namespace)
                 return True, make_result(req_id, None)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "ref":
             try:
                 result = handle_ref(request)
                 return True, make_result(req_id, result)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "release":
             try:
                 handle_release(request)
                 return True, make_result(req_id, None)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "call":
             try:
                 result = handle_call(request)
                 return True, make_result(req_id, result)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "getattr":
             try:
                 result = handle_getattr(request)
                 return True, make_result(req_id, result)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "ping":
             return True, make_result(req_id, "pong")
@@ -386,7 +386,7 @@ def handle_request(request):
                 result = handle_health()
                 return True, make_result(req_id, result)
             except Exception as e:
-                return True, make_error(req_id, format_error(e))
+                return True, make_error(req_id, *format_error(e))
 
         elif req_type == "stream":
             return True, make_error(req_id, "stream must be handled by the calling loop")
@@ -464,12 +464,15 @@ def make_result(req_id, value):
     }
 
 
-def make_error(req_id, message):
-    return {
+def make_error(req_id, message, error_type=None):
+    result = {
         "id": req_id,
         "type": "error",
         "message": message,
     }
+    if error_type is not None:
+        result["error_type"] = error_type
+    return result
 
 
 def write_error_msgpack(req_id, message):
@@ -478,8 +481,8 @@ def write_error_msgpack(req_id, message):
 
 
 def format_error(e):
-    """Format an exception as a string including the full traceback."""
-    return traceback.format_exc().strip()
+    """Format an exception returning (traceback, error_type)."""
+    return traceback.format_exc().strip(), type(e).__name__
 
 
 if __name__ == "__main__":

@@ -188,5 +188,87 @@ class PythonExecutionExceptionTest {
         assertNotNull(e.getPythonTraceback());
         assertEquals("call(refId=1, method=get_value)", e.getCauseCode());
         assertNull(e.getCause()); // no chained exception from protocol path
+        assertNull(e.getPythonErrorType()); // 3-arg constructor, no errorType
+    }
+
+    // ==================================================================
+    // getPythonErrorType
+    // ==================================================================
+
+    @Test
+    void getPythonErrorType_returnsNull_whenNotProvided() {
+        PythonExecutionException e = new PythonExecutionException("error");
+        assertNull(e.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsNull_fromTwoArgConstructor() {
+        PythonExecutionException e = new PythonExecutionException("error", "Traceback...");
+        assertNull(e.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsNull_fromThreeArgConstructor() {
+        PythonExecutionException e = new PythonExecutionException(
+                "TypeError: bad", "Traceback...", "eval(1+ 'x')");
+        assertNull(e.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsProvidedErrorType() {
+        PythonExecutionException e = new PythonExecutionException(
+                "ValueError: invalid literal",
+                "Traceback (most recent call last):\nValueError: invalid literal",
+                "eval(int('abc'))",
+                "ValueError");
+        assertEquals("ValueError", e.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsZeroDivisionError() {
+        PythonExecutionException e = new PythonExecutionException(
+                "ZeroDivisionError: division by zero",
+                "Traceback...",
+                "eval(1/0)",
+                "ZeroDivisionError");
+        assertEquals("ZeroDivisionError", e.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsKeyError() {
+        PythonExecutionException e = new PythonExecutionException(
+                "KeyError: 'missing'",
+                "Traceback...",
+                "eval({}['missing'])",
+                "KeyError");
+        assertEquals("KeyError", e.getPythonErrorType());
+    }
+
+    @Test
+    void wrap_preservesErrorType_fromPythonExecutionException() {
+        PythonExecutionException original = new PythonExecutionException(
+                "AttributeError: no attr",
+                "Traceback...",
+                "call(refId=1, method=nonexistent)",
+                "AttributeError");
+        PythonExecutionException wrapped = PythonExecutionException.wrap("call", original);
+
+        assertSame(original, wrapped);
+        assertEquals("AttributeError", wrapped.getPythonErrorType());
+    }
+
+    @Test
+    void wrap_setsErrorTypeNull_forNonPythonExecutionException() {
+        IOException cause = new IOException("Broken pipe");
+        PythonExecutionException wrapped = PythonExecutionException.wrap("exec", cause);
+
+        assertNull(wrapped.getPythonErrorType());
+    }
+
+    @Test
+    void getPythonErrorType_returnsNull_whenExplicitlyNull() {
+        PythonExecutionException e = new PythonExecutionException(
+                "generic error", "Traceback...", null, null);
+        assertNull(e.getPythonErrorType());
     }
 }

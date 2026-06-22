@@ -108,6 +108,93 @@ class PythonEmbedBinaryIntegrationTest {
         assertTrue(ex.getMessage().contains("NameError"));
     }
 
+    // ---- Error type propagation ----
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void eval_zeroDivisionError_hasCorrectErrorType() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.eval("1/0"));
+        assertEquals("ZeroDivisionError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("ZeroDivisionError"));
+        assertTrue(ex.getCauseCode().contains("1/0"));
+        assertTrue(ex.getPythonTraceback().contains("ZeroDivisionError"));
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void eval_valueError_hasCorrectErrorType() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.eval("int('abc')"));
+        assertEquals("ValueError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("ValueError"));
+        assertTrue(ex.getCauseCode().contains("int('abc')"));
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void eval_keyError_hasCorrectErrorType() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.eval("{}['missing']"));
+        assertEquals("KeyError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("KeyError"));
+        assertTrue(ex.getCauseCode().contains("{}['missing']"));
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void eval_typeError_hasCorrectErrorType() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.eval("1 + 'string'"));
+        assertEquals("TypeError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("TypeError"));
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void exec_syntaxError_hasCorrectErrorType() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.exec("if True print('bad')"));
+        assertEquals("SyntaxError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("SyntaxError"));
+        assertNotNull(ex.getCauseCode());
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void call_nonexistentMethod_hasAttributeError() {
+        py.exec("s = 'hello'");
+        try (PythonHandle handle = py.ref("s")) {
+            PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                    () -> handle.call("nonexistent_method"));
+            assertEquals("AttributeError", ex.getPythonErrorType());
+            assertTrue(ex.getMessage().contains("AttributeError"));
+            assertTrue(ex.getCauseCode().contains("nonexistent_method"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void getAttr_nonexistentAttr_hasAttributeError() {
+        py.exec("s = 'hello'");
+        try (PythonHandle handle = py.ref("s")) {
+            PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                    () -> handle.getAttr("nonexistent_attr"));
+            assertEquals("AttributeError", ex.getPythonErrorType());
+            assertTrue(ex.getMessage().contains("AttributeError"));
+            assertTrue(ex.getCauseCode().contains("nonexistent_attr"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void ref_nonexistentVar_hasNameError() {
+        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
+                () -> py.ref("nonexistent_var"));
+        assertEquals("NameError", ex.getPythonErrorType());
+        assertTrue(ex.getMessage().contains("NameError"));
+    }
+
     // ---- Binary protocol: exec and state ----
 
     @Test

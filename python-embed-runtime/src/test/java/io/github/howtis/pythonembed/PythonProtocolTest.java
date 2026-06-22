@@ -96,7 +96,7 @@ class PythonProtocolTest {
     void registerRequest_thenCompleteResponse_completesFuture() throws Exception {
         TestProtocol proto = new TestProtocol();
         CompletableFuture<PythonProtocol.Response> future = proto.registerRequest(1);
-        PythonProtocol.Response response = new PythonProtocol.Response(1, "result", 42.0, null);
+        PythonProtocol.Response response = new PythonProtocol.Response(1, "result", 42.0, null, null);
         proto.completeResponse(response);
 
         assertTrue(future.isDone());
@@ -108,7 +108,7 @@ class PythonProtocolTest {
     void completeResponse_unknownId_doesNothing() {
         TestProtocol proto = new TestProtocol();
         // Should not throw
-        proto.completeResponse(new PythonProtocol.Response(999, "result", null, null));
+        proto.completeResponse(new PythonProtocol.Response(999, "result", null, null, null));
     }
 
     @Test
@@ -121,7 +121,7 @@ class PythonProtocolTest {
         // only the new future receives completions.
         assertNotSame(first, second);
         assertFalse(first.isDone());
-        PythonProtocol.Response response = new PythonProtocol.Response(1, "result", "ok", null);
+        PythonProtocol.Response response = new PythonProtocol.Response(1, "result", "ok", null, null);
         proto.completeResponse(response);
         assertTrue(second.isDone());
         assertFalse(first.isDone()); // orphaned, never completed
@@ -154,7 +154,7 @@ class PythonProtocolTest {
 
         // New requests should work fine after cancelAll
         CompletableFuture<PythonProtocol.Response> f = proto.registerRequest(2);
-        proto.completeResponse(new PythonProtocol.Response(2, "result", "ok", null));
+        proto.completeResponse(new PythonProtocol.Response(2, "result", "ok", null, null));
         assertDoesNotThrow(() -> assertEquals("ok", f.get().value()));
     }
 
@@ -205,7 +205,7 @@ class PythonProtocolTest {
     void awaitResponse_completedNormally_returnsResponse() throws Throwable {
         TestProtocol proto = new TestProtocol();
         CompletableFuture<PythonProtocol.Response> future = proto.registerRequest(1);
-        PythonProtocol.Response expected = new PythonProtocol.Response(1, "result", "data", null);
+        PythonProtocol.Response expected = new PythonProtocol.Response(1, "result", "data", null, null);
         future.complete(expected);
 
         PythonProtocol.Response actual = invokeAwaitResponse(proto, 1, future, "eval");
@@ -340,7 +340,7 @@ class PythonProtocolTest {
             @Override
             CompletableFuture<PythonProtocol.Response> registerRequest(int id, long customTimeoutMs) {
                 CompletableFuture<PythonProtocol.Response> future = new CompletableFuture<>();
-                future.complete(new PythonProtocol.Response(id, "error", null, "ZeroDivisionError: division by zero"));
+                future.complete(new PythonProtocol.Response(id, "error", null, "ZeroDivisionError: division by zero", null));
                 pendingRequests.put(id, future);
                 return future;
             }
@@ -393,7 +393,7 @@ class PythonProtocolTest {
         assertFalse(result.futures().get(0).isDone());
 
         // Simulate response arriving from Python
-        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "result", 2.0, null));
+        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "result", 2.0, null, null));
         assertTrue(result.futures().get(0).isDone());
         assertEquals(2.0, result.futures().get(0).get().value());
         assertFalse(result.futures().get(0).get().isError());
@@ -408,7 +408,7 @@ class PythonProtocolTest {
         );
         PythonProtocol.BatchResult result = proto.sendBatch(noopWriter, items);
 
-        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "error", null, "division by zero"));
+        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "error", null, "division by zero", null));
         assertTrue(result.futures().get(0).isDone());
         assertTrue(result.futures().get(0).get().isError());
         assertEquals("division by zero", result.futures().get(0).get().message());
@@ -426,9 +426,9 @@ class PythonProtocolTest {
         PythonProtocol.BatchResult result = proto.sendBatch(noopWriter, items);
 
         // Complete them out of order
-        proto.completeResponse(new PythonProtocol.Response(result.ids()[1], "result", "B", null));
-        proto.completeResponse(new PythonProtocol.Response(result.ids()[2], "result", null, null));
-        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "result", "A", null));
+        proto.completeResponse(new PythonProtocol.Response(result.ids()[1], "result", "B", null, null));
+        proto.completeResponse(new PythonProtocol.Response(result.ids()[2], "result", null, null, null));
+        proto.completeResponse(new PythonProtocol.Response(result.ids()[0], "result", "A", null, null));
 
         assertEquals("A", result.futures().get(0).get().value());
         assertEquals("B", result.futures().get(1).get().value());

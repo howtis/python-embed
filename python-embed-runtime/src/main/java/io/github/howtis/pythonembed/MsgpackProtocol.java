@@ -204,7 +204,8 @@ final class MsgpackProtocol extends PythonProtocol {
             } else {
                 Object value = map.get("value");
                 String message = (String) map.get("message");
-                completeResponse(new Response(id, type, value, message));
+                String errorType = (String) map.get("error_type");
+                completeResponse(new Response(id, type, value, message, errorType));
             }
         } catch (Exception e) {
             // Malformed MessagePack - log and ignore
