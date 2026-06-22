@@ -1,0 +1,16 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.gradlelet/
+*.iml
+.idea/
+*.ipr
+*.iws
+out/
+*.log
+*.tmp
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db

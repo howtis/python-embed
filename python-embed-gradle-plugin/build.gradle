@@ -1,0 +1,28 @@
+plugins {
+    id 'java-gradle-plugin'
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+gradlePlugin {
+    plugins {
+        pythonEmbed {
+            id = 'com.example.python-embed'
+            implementationClass = 'com.example.pythonembed.gradle.PythonEmbedPlugin'
+        }
+    }
+}
+
+dependencies {
+    implementation gradleApi()
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}

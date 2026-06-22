@@ -1,0 +1,4 @@
+rootProject.name = 'python-embed'
+
+includeBuild 'python-embed-gradle-plugin'
+include 'python-embed-runtime'

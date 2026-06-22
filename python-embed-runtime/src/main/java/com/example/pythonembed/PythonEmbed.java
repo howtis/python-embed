@@ -1,0 +1,961 @@
+package com.example.pythonembed;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.util.Iterator;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Main API for embedding Python in Java applications.
+ * Uses a persistent CPython process with stdin/stdout
+ * MessagePack (binary) protocol.
+ *
+ * <p>All configuration is consolidated in {@link Options}.
+ * The Python environment (venv) can be provided in three ways:
+ * <ol>
+ *   <li><b>Explicit path</b> -- via {@link Options.Builder#venvPath(Path)}
+ *       uses the given venv directory directly (no JAR extraction).</li>
+ *   <li><b>Properties-driven</b> -- reads
+ *       {@code META-INF/python-embed.properties} from the classpath
+ *       and uses the configured {@code venv.path} if
+ *       {@code venv.embedded=false}.</li>
+ *   <li><b>Classpath resource</b> -- Falls back to extracting
+ *       {@code python-venv/} from the JAR into a temp directory.</li>
+ * </ol>
+ *
+ * <pre>{@code
+ * // Default usage -- self-builder:
+ * try (PythonEmbed py = PythonEmbed.builder().build()) {
+ *     int result = py.eval("sum([1, 2, 3])").asInt();
+ *     py.exec("x = 42");
+ * }
+ *
+ * // With explicit venv path:
+ * try (PythonEmbed py = PythonEmbed.builder()
+ *         .venvPath(Path.of("/opt/myapp/venv")).build()) {
+ *     py.exec("import numpy as np");
+ * }
+ *
+ * // With GPU support:
+ * try (PythonEmbed py = PythonEmbed.builder()
+ *         .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
+ *         .build()) {
+ *     py.exec("import torch; print(torch.cuda.is_available())");
+ * }
+ *
+ * // Or via Options (same result, useful when passing config around):
+ * PythonEmbed.Options opts = PythonEmbed.Options.builder()
+ *         .venvPath(Path.of("/opt/myapp/venv")).build();
+ * try (PythonEmbed py = PythonEmbed.create(opts)) { ... }
+ * }</pre>
+ */
+public class PythonEmbed implements AutoCloseable {
+
+    private static final Logger logger = Logger.getLogger(PythonEmbed.class.getName());
+    private static final String VENV_RESOURCE_PATH = "python-venv";
+    private static final String BRIDGE_RESOURCE_PATH = "com/example/pythonembed/bridge.py";
+    private static final String PROPS_PATH = "META-INF/python-embed.properties";
+    private static final String PROPS_KEY_VENV_PATH = "venv.path";
+    private static final String PROPS_KEY_VENV_EMBEDDED = "venv.embedded";
+
+    private final VenvExtractor venvExtractor;
+    private final PythonProcessManager processManager;
+    final PythonProtocol protocol;
+    final PythonProtocol.Writer writer;
+    private final Map<String, String> env;
+    private final Path explicitVenvPath;
+    final Options options;
+    private final List<PythonHandle> handles = new CopyOnWriteArrayList<>();
+    private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
+    private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
+    private Path venvPath;
+    private Path bridgePath;
+
+    PythonEmbed(Options options) {
+        this.venvExtractor = new VenvExtractor();
+        this.options = options;
+        this.protocol = new MsgpackProtocol(options.timeoutMs());
+        this.processManager = new PythonProcessManager(protocol);
+        this.writer = processManager.stdinWriter();
+        this.env = options.env();
+        this.explicitVenvPath = options.venvPath();
+    }
+
+    void setSerializationSizeListener(PythonProtocol.SerializationSizeListener listener) {
+        protocol.setSerializationSizeListener(listener);
+    }
+
+    /**
+     * Creates a new PythonEmbed instance with the given options.
+     *
+     * <p>The {@link Options} class consolidates all configuration:
+     * venv path, environment variables, timeouts, warmup scripts, etc.
+     * Use {@link Options#builder()} for fluent construction.
+     *
+     * <pre>{@code
+     * // Defaults:
+     * PythonEmbed py = PythonEmbed.create(Options.defaults());
+     *
+     * // With explicit venv:
+     * PythonEmbed py = PythonEmbed.create(
+     *         Options.builder().venvPath(Path.of("/opt/venv")).build());
+     *
+     * // With GPU support:
+     * PythonEmbed py = PythonEmbed.create(
+     *         Options.builder()
+     *                 .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
+     *                 .build());
+     * }</pre>
+     *
+     * @param options consolidated configuration (venv path, env, timeouts, etc.)
+     * @return a ready-to-use PythonEmbed instance
+     * @throws IOException if venv extraction or process startup fails
+     */
+    public static PythonEmbed create(Options options) throws IOException {
+        PythonEmbed embed = new PythonEmbed(options);
+        embed.initialize();
+        return embed;
+    }
+
+    /**
+     * Returns a new {@link Builder} for constructing a {@link PythonEmbed}
+     * without going through {@link Options}.
+     *
+     * <pre>{@code
+     * // Simple default instance:
+     * PythonEmbed py = PythonEmbed.builder().build();
+     *
+     * // With explicit venv:
+     * PythonEmbed py = PythonEmbed.builder()
+     *         .venvPath(Path.of("/opt/venv"))
+     *         .build();
+     *
+     * // With GPU support:
+     * PythonEmbed py = PythonEmbed.builder()
+     *         .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
+     *         .timeoutMs(60_000)
+     *         .build();
+     * }</pre>
+     *
+     * @return a new Builder with default values
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    private void initialize() throws IOException {
+        Properties props = loadProperties();
+
+        // Resolve venv path
+        if (explicitVenvPath != null) {
+            venvPath = resolveExplicitPath(explicitVenvPath);
+        } else {
+            venvPath = resolveFromProperties(props);
+            if (venvPath == null) {
+                // Fall back to classpath resource extraction
+                venvPath = venvExtractor.extract(VENV_RESOURCE_PATH);
+            }
+        }
+
+        // Extract bridge.py to temp
+        bridgePath = extractBridge();
+
+        // Start the Python REPL process
+        processManager.start(venvPath, bridgePath, env,
+                options.maxCodeLength(),
+                options.pythonExecutable(), options.startupTimeoutMs());
+
+        setupCallbackDispatcher();
+
+        // Execute warmup scripts
+        for (String script : options.warmupScripts()) {
+            try {
+                protocol.sendExec(writer, script, options.timeoutMs());
+            } catch (Exception e) {
+                if (options.lenientWarmup()) {
+                    logger.log(Level.WARNING, "Warmup script failed: " + script, e);
+                } else {
+                    throw new IOException("Warmup script failed: " + script, e);
+                }
+            }
+        }
+
+        logger.info("PythonEmbed initialized successfully");
+    }
+
+    private void setupCallbackDispatcher() {
+        protocol.setCallbackDispatcher(new PythonProtocol.CallbackDispatcher() {
+            @Override
+            public Object dispatchCall(int id, String name, List<Object> args) throws Exception {
+                CallbackHandler handler = callbackHandlers.get(name);
+                if (handler == null) {
+                    byte[] err = protocol.buildCallbackError(
+                            id, "No callback registered for name: " + name);
+                    try {
+                        writer.write(err);
+                    } catch (IOException ignored) {
+                    }
+                    throw new RuntimeException("No callback registered for name: " + name);
+                }
+                try {
+                    Object result = handler.handle(args.toArray());
+                    byte[] resp = protocol.buildCallbackResult(id, result);
+                    writer.write(resp);
+                    return result;
+                } catch (Exception e) {
+                    byte[] err = protocol.buildCallbackError(id, e.toString());
+                    try {
+                        writer.write(err);
+                    } catch (IOException ignored) {
+                    }
+                    throw e;
+                }
+            }
+
+            @Override
+            public void dispatchPush(int id, String name, Object value) {
+                PushHandler handler = pushHandlers.get(name);
+                if (handler == null) {
+                    logger.warning("No push handler registered for name: " + name);
+                    return;
+                }
+                try {
+                    handler.accept(name, value);
+                } catch (Exception e) {
+                    logger.log(Level.WARNING,
+                            "Push handler '" + name + "' threw exception", e);
+                }
+            }
+        });
+    }
+
+
+    private Path resolveExplicitPath(Path path) throws IOException {
+        if (!Files.isDirectory(path)) {
+            throw new IOException("Venv directory does not exist or is not a directory: " + path);
+        }
+        logger.info(() -> "Using explicit venv path: " + path);
+        return path;
+    }
+
+    /**
+     * Reads properties and returns the venv path if the venv is external
+     * (not embedded in JAR). Returns {@code null} if the venv is embedded
+     * or properties are missing.
+     */
+    private Path resolveFromProperties(Properties props) throws IOException {
+        if (props == null) {
+            return null;
+        }
+
+        String embeddedStr = props.getProperty(PROPS_KEY_VENV_EMBEDDED, "true");
+        boolean embedded = Boolean.parseBoolean(embeddedStr);
+
+        String pathStr = props.getProperty(PROPS_KEY_VENV_PATH);
+        Path path = (pathStr != null && !pathStr.isEmpty()) ? Path.of(pathStr) : null;
+
+        if (embedded) {
+            // When embedded=true, use the build-time venv path if it still exists
+            // (development/test scenario). This avoids unnecessary classpath
+            // extraction when the venv is already on the filesystem.
+            if (path != null && Files.isDirectory(path)) {
+                logger.info(() -> "Using embedded venv path from properties: " + path);
+                return path;
+            }
+            logger.fine("venv.embedded=true -- will extract from classpath");
+            return null;
+        }
+
+        if (path == null) {
+            return null;
+        }
+
+        if (!Files.isDirectory(path)) {
+            logger.warning(() -> "External venv path from properties does not exist: " + path
+                    + " -- falling back to classpath extraction");
+            return null;
+        }
+
+        logger.info(() -> "Using venv path from properties: " + path);
+        return path;
+    }
+
+    private Properties loadProperties() {
+        try (InputStream is = getClass().getClassLoader()
+                .getResourceAsStream(PROPS_PATH)) {
+            if (is == null) {
+                logger.fine("No " + PROPS_PATH + " found on classpath");
+                return null;
+            }
+            Properties props = new Properties();
+            props.load(is);
+            return props;
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Failed to read " + PROPS_PATH, e);
+            return null;
+        }
+    }
+
+    /**
+     * Evaluates a Python expression and returns the result.
+     *
+     * @param code Python expression to evaluate
+     * @return the result wrapped in PythonValue
+     * @throws PythonExecutionException if Python evaluation fails
+     * @throws TimeoutException if evaluation exceeds the configured timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public PythonValue eval(String code)
+            throws PythonExecutionException, TimeoutException, IOException {
+        return protocol.sendEval(writer, code);
+    }
+
+    /**
+     * Evaluates a Python expression with a per-call timeout override.
+     *
+     * @param code Python expression to evaluate
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return the result wrapped in PythonValue
+     * @throws PythonExecutionException if Python evaluation fails
+     * @throws TimeoutException if evaluation exceeds the timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public PythonValue eval(String code, long timeoutMs)
+            throws PythonExecutionException, TimeoutException, IOException {
+        return protocol.sendEval(writer, code, timeoutMs);
+    }
+
+    /**
+     * Executes one or more Python statements.
+     * State is preserved across calls (shared namespace).
+     *
+     * @param code Python statements to execute
+     * @throws PythonExecutionException if Python execution fails
+     * @throws TimeoutException if execution exceeds the configured timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public void exec(String code)
+            throws PythonExecutionException, TimeoutException, IOException {
+        protocol.sendExec(writer, code);
+    }
+
+    /**
+     * Executes Python statements with a per-call timeout override.
+     *
+     * @param code Python statements to execute
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @throws PythonExecutionException if Python execution fails
+     * @throws TimeoutException if execution exceeds the timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public void exec(String code, long timeoutMs)
+            throws PythonExecutionException, TimeoutException, IOException {
+        protocol.sendExec(writer, code, timeoutMs);
+    }
+
+    /**
+     * Executes a warmup script on an already-running Python instance.
+     *
+     * @param script Python code to execute (typically import statements)
+     * @throws PythonExecutionException if Python execution fails
+     * @throws TimeoutException if execution exceeds the configured timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public void warmup(String script)
+            throws PythonExecutionException, TimeoutException, IOException {
+        protocol.sendExec(writer, script, options.timeoutMs());
+    }
+
+    /**
+     * Evaluates multiple Python expressions in a single batch request,
+     * reducing N-1 round-trips compared to N individual eval calls.
+     *
+     * <p>All expressions are evaluated sequentially in the shared namespace,
+     * so later expressions can reference side-effects of earlier ones.
+     *
+     * @param codes Python expressions to evaluate
+     * @return a list of results, one per expression, in the same order
+     * @throws PythonExecutionException if any expression fails
+     * @throws TimeoutException if the batch exceeds the configured timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public List<PythonValue> batchEval(List<String> codes)
+            throws PythonExecutionException, TimeoutException, IOException {
+        return batchEval(codes, 0);
+    }
+
+    /**
+     * Evaluates multiple Python expressions in a single batch request
+     * with a per-call timeout override.
+     *
+     * @param codes Python expressions to evaluate
+     * @param timeoutMs timeout in milliseconds for the entire batch;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a list of results, one per expression, in the same order
+     * @throws PythonExecutionException if any expression fails
+     * @throws TimeoutException if the batch exceeds the timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public List<PythonValue> batchEval(List<String> codes, long timeoutMs)
+            throws PythonExecutionException, TimeoutException, IOException {
+        return protocol.sendBatchEval(writer, codes, timeoutMs);
+    }
+
+    /**
+     * Executes multiple Python statements in a single batch request,
+     * reducing N-1 round-trips compared to N individual exec calls.
+     *
+     * <p>Statements are executed sequentially in the shared namespace.
+     *
+     * @param codes Python statements to execute
+     * @throws PythonExecutionException if any statement fails
+     * @throws TimeoutException if the batch exceeds the configured timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public void batchExec(List<String> codes)
+            throws PythonExecutionException, TimeoutException, IOException {
+        batchExec(codes, 0);
+    }
+
+    /**
+     * Executes multiple Python statements in a single batch request
+     * with a per-call timeout override.
+     *
+     * @param codes Python statements to execute
+     * @param timeoutMs timeout in milliseconds for the entire batch;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @throws PythonExecutionException if any statement fails
+     * @throws TimeoutException if the batch exceeds the timeout
+     * @throws IOException if communication with Python process fails
+     */
+    public void batchExec(List<String> codes, long timeoutMs)
+            throws PythonExecutionException, TimeoutException, IOException {
+        protocol.sendBatchExec(writer, codes, timeoutMs);
+    }
+
+    /**
+     * Creates a handle to a Python variable, keeping the object in Python
+     * memory and avoiding re-serialization on subsequent calls.
+     *
+     * @param variableName the name of an existing Python variable
+     * @return a handle that can be used for method calls and attribute access
+     * @throws PythonExecutionException if the variable doesn't exist
+     * @throws TimeoutException if the request times out
+     * @throws IOException if communication with Python process fails
+     */
+    public PythonHandle ref(String variableName)
+            throws PythonExecutionException, TimeoutException, IOException {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> refInfo = protocol.sendRef(writer, variableName);
+        int refId = ((Number) refInfo.get("ref_id")).intValue();
+        String type = (String) refInfo.get("type");
+        PythonHandle handle = new PythonHandle(this, protocol, writer, refId, type);
+        handles.add(handle);
+        return handle;
+    }
+
+    /**
+     * Creates a dynamic proxy that wraps a Python object as a Java interface.
+     *
+     * <p>The Python object is identified by its {@code refId} (obtained via
+     * {@link #ref(String)}). Each interface method call is transparently
+     * routed to the Python object using the {@code call}/{@code getattr}
+     * protocol commands.
+     *
+     * <p>Java camelCase method names are automatically converted to Python
+     * snake_case when an exact match is not found (e.g., {@code calculateSum}
+     * maps to {@code calculate_sum}).
+     *
+     * <p>Python exceptions are propagated as {@link PythonExecutionException}.
+     *
+     * <pre>{@code
+     * PythonHandle handle = py.ref("my_object");
+     * MyInterface obj = py.proxy(handle.getRefId(), MyInterface.class);
+     * String result = obj.process("input");  // calls my_object.process("input")
+     * }</pre>
+     *
+     * @param <T>            the interface type
+     * @param refId          the Python object reference ID from {@link PythonHandle#refId()}
+     * @param interfaceClass the Java interface to proxy
+     * @return a dynamic proxy implementing the given interface
+     * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T proxy(int refId, Class<T> interfaceClass) {
+        if (!interfaceClass.isInterface()) {
+            throw new IllegalArgumentException(
+                    "proxy() requires an interface, got: " + interfaceClass.getName());
+        }
+        PythonProxy handler = new PythonProxy(protocol, writer, refId, options.timeoutMs());
+        return (T) java.lang.reflect.Proxy.newProxyInstance(
+                interfaceClass.getClassLoader(),
+                new Class<?>[]{interfaceClass},
+                handler);
+    }
+
+    /**
+     * Shortcut that wraps a Python variable as a Java interface proxy
+     * in a single call.
+     *
+     * <p>Equivalent to {@code proxy(ref(name).refId(), interfaceClass)}
+     * but with automatic handle lifecycle management: the Python object
+     * stays alive as long as the returned proxy is reachable.
+     *
+     * <pre>{@code
+     * py.exec("class Calc:\n    def add(self, a, b): return a + b\ncalc = Calc()");
+     * Calculator c = py.proxy("calc", Calculator.class);
+     * int result = c.add(3, 4);  // 7
+     * }</pre>
+     *
+     * @param <T>            the interface type
+     * @param variableName   the Python variable name in the global scope
+     * @param interfaceClass the Java interface to proxy
+     * @return a dynamic proxy implementing the given interface
+     * @throws PythonExecutionException if ref resolution fails
+     * @throws IOException if the Python process is unavailable
+     * @throws TimeoutException if the operation times out
+     * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T proxy(String variableName, Class<T> interfaceClass)
+            throws PythonExecutionException, TimeoutException, IOException {
+        if (!interfaceClass.isInterface()) {
+            throw new IllegalArgumentException(
+                    "proxy() requires an interface, got: " + interfaceClass.getName());
+        }
+        PythonHandle handle = ref(variableName);
+        PythonProxy handler = new PythonProxy(protocol, writer, handle.refId(),
+                options.timeoutMs(), handle);
+        return (T) java.lang.reflect.Proxy.newProxyInstance(
+                interfaceClass.getClassLoader(),
+                new Class<?>[]{interfaceClass},
+                handler);
+    }
+
+    /**
+     * Streams results from a Python generator or iterable expression.
+     *
+     * <p>The code must evaluate to an iterable (generator, list, tuple, etc.).
+     * Each item is yielded as a separate {@link PythonValue} through the returned
+     * {@link Iterator}. The iterator blocks on {@code next()} until the next
+     * item arrives from the Python process.
+     *
+     * @param code a Python expression that evaluates to an iterable
+     * @return an iterator over the streamed values
+     * @throws IOException if the stream request fails
+     */
+    public Iterator<PythonValue> stream(String code) throws IOException {
+        return protocol.sendStream(writer, code);
+    }
+
+    /**
+     * Streams results with a per-item poll timeout override.
+     *
+     * @param code a Python expression that evaluates to an iterable
+     * @param timeoutMs timeout in milliseconds per poll;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return an iterator over the streamed values
+     * @throws IOException if the stream request fails
+     */
+    public Iterator<PythonValue> stream(String code, long timeoutMs) throws IOException {
+        return protocol.sendStream(writer, code, timeoutMs);
+    }
+
+    /**
+     * Pings the Python process to check if it is still healthy.
+     *
+     * <p>Sends a ping request and waits for a pong response.
+     *
+     * @return true if the Python process is healthy and responded
+     * @throws IOException if an I/O error occurs writing to the process
+     */
+    public boolean ping() throws IOException {
+        return protocol.sendPing(writer);
+    }
+
+    /**
+     * Collects health information from the Python process.
+     *
+     * <p>Returns memory usage, active reference count, GC status, and
+     * GC generation counts.
+     *
+     * @return health data collected from the Python process
+     * @throws PythonExecutionException if the Python process returns an error
+     * @throws TimeoutException if the request times out
+     * @throws IOException if an I/O error occurs
+     */
+    public HealthInfo health() throws PythonExecutionException, TimeoutException, IOException {
+        return protocol.sendHealth(writer);
+    }
+
+    void forgetHandle(PythonHandle handle) {
+        handles.remove(handle);
+    }
+
+    boolean isOpen() {
+        return processManager.isRunning();
+    }
+
+    /**
+     * Registers a callback handler that Python can call via
+     * {@code _bridge.call(name, ...)}.
+     *
+     * @param name    the name Python uses to identify this handler
+     * @param handler the handler that receives args and returns a value
+     */
+    public void registerCallback(String name, CallbackHandler handler) {
+        callbackHandlers.put(name, handler);
+    }
+
+    /**
+     * Registers a push handler that receives fire-and-forget pushes
+     * from Python via {@code _bridge.push(name, value)}.
+     *
+     * @param name    the name Python uses to identify this handler
+     * @param handler the handler that receives name and value
+     */
+    public void registerPushHandler(String name, PushHandler handler) {
+        pushHandlers.put(name, handler);
+    }
+
+    @Override
+    public void close() {
+        closeInternal(5_000, 2_000);
+    }
+
+    /**
+     * Gracefully shuts down with a configurable shutdown timeout.
+     *
+     * <p>Sends an exit command to the Python process, waits up to the
+     * given timeout for graceful termination, then force-destroys
+     * the process if it's still alive. A brief additional wait
+     * (2 seconds) is applied after force-destroy.
+     *
+     * @param timeout the maximum time to wait for graceful shutdown
+     * @param unit the time unit of the timeout argument
+     */
+    public void close(long timeout, TimeUnit unit) {
+        long waitMs = unit.toMillis(timeout);
+        closeInternal(waitMs, Math.min(waitMs / 2, 2_000));
+    }
+
+    private void closeInternal(long waitMs, long forceWaitMs) {
+        // Release all tracked handles
+        for (PythonHandle handle : handles) {
+            try {
+                handle.release();
+            } catch (Exception e) {
+                logger.log(Level.FINE, "Error releasing handle", e);
+            }
+        }
+        handles.clear();
+
+        callbackHandlers.clear();
+        pushHandlers.clear();
+
+        try {
+            processManager.close(waitMs, forceWaitMs);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Error closing process manager", e);
+        }
+        try {
+            venvExtractor.close();
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Error cleaning up venv", e);
+        }
+    }
+
+    /**
+     * Configuration options for PythonEmbed.
+     *
+     * <p>For quick one-off construction, prefer {@link PythonEmbed#builder()}:
+     * <pre>{@code
+     * try (PythonEmbed py = PythonEmbed.builder()
+     *         .timeoutMs(60_000)
+     *         .venvPath(Path.of("/opt/venv"))
+     *         .build()) { ... }
+     * }</pre>
+     *
+     * <p>Use Options when you need to pass configuration around:
+     * <pre>{@code
+     * Options opts = Options.builder()
+     *         .timeoutMs(60_000)
+     *         .venvPath(Path.of("/opt/venv"))
+     *         .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
+     *         .build();
+     * try (PythonEmbed py = PythonEmbed.create(opts)) { ... }
+     * }</pre>
+     */
+    public static final class Options {
+        private final long timeoutMs;
+        private final int maxCodeLength;
+        private final long startupTimeoutMs;
+        private final String pythonExecutable;
+        private final List<String> warmupScripts;
+        private final boolean lenientWarmup;
+        private final Path venvPath;
+        private final Map<String, String> env;
+
+        private Options(long timeoutMs,
+                        int maxCodeLength, long startupTimeoutMs,
+                        String pythonExecutable,
+                        List<String> warmupScripts,
+                        boolean lenientWarmup,
+                        Path venvPath,
+                        Map<String, String> env) {
+            this.timeoutMs = timeoutMs;
+            this.maxCodeLength = maxCodeLength;
+            this.startupTimeoutMs = startupTimeoutMs;
+            this.pythonExecutable = pythonExecutable;
+            this.warmupScripts = warmupScripts;
+            this.lenientWarmup = lenientWarmup;
+            this.venvPath = venvPath;
+            this.env = env;
+        }
+
+        /** Per-request timeout in milliseconds (default: 30_000). */
+        public long timeoutMs() { return timeoutMs; }
+
+        /** Maximum code length in characters (default: 100_000). */
+        public int maxCodeLength() { return maxCodeLength; }
+
+        /** Startup timeout in milliseconds (default: 30_000). */
+        public long startupTimeoutMs() { return startupTimeoutMs; }
+
+        /** Python executable override, or null for auto-detect. */
+        public String pythonExecutable() { return pythonExecutable; }
+
+        /** Warmup scripts to execute after instance initialization. */
+        public List<String> warmupScripts() { return warmupScripts; }
+
+        /**
+         * Whether warmup script failures should be logged as warnings
+         * instead of throwing exceptions. Default is {@code true}
+         * (backward-compatible; failures are logged but do not prevent startup).
+         * Set to {@code false} to make warmup failures immediately visible.
+         */
+        public boolean lenientWarmup() { return lenientWarmup; }
+
+        /** Explicit venv path, or null for auto-discovery / classpath extraction. */
+        public Path venvPath() { return venvPath; }
+
+        /** Environment variables to pass to the Python process (never null). */
+        public Map<String, String> env() { return env; }
+
+        static Options defaults() {
+            return new Options(30_000, 100_000, 30_000, null, Collections.emptyList(), true,
+                    null, Collections.emptyMap());
+        }
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public static final class Builder {
+            private long timeoutMs = 30_000;
+            private int maxCodeLength = 100_000;
+            private long startupTimeoutMs = 30_000;
+            private String pythonExecutable = null;
+            private final List<String> warmupScripts = new ArrayList<>();
+            private boolean lenientWarmup = true;
+            private Path venvPath = null;
+            private Map<String, String> env = Collections.emptyMap();
+
+            /** Set per-request timeout in milliseconds. */
+            public Builder timeoutMs(long value) {
+                this.timeoutMs = value;
+                return this;
+            }
+
+            /** Set maximum code length in characters. */
+            public Builder maxCodeLength(int value) {
+                this.maxCodeLength = value;
+                return this;
+            }
+
+            /** Set startup timeout in milliseconds. */
+            public Builder startupTimeoutMs(long value) {
+                this.startupTimeoutMs = value;
+                return this;
+            }
+
+            /** Override the Python executable path. */
+            public Builder pythonExecutable(String value) {
+                this.pythonExecutable = value;
+                return this;
+            }
+
+            /** Append a warmup script to execute after instance initialization. */
+            public Builder warmupScript(String script) {
+                this.warmupScripts.add(script);
+                return this;
+            }
+
+            /** Append multiple warmup scripts at once. */
+            public Builder warmupScripts(List<String> scripts) {
+                this.warmupScripts.addAll(scripts);
+                return this;
+            }
+
+            /**
+             * Set whether warmup script failures should be logged as warnings
+             * instead of throwing exceptions. Default is {@code true}.
+             */
+            public Builder lenientWarmup(boolean value) {
+                this.lenientWarmup = value;
+                return this;
+            }
+
+            /** Set the explicit venv path (null for auto-discovery). */
+            public Builder venvPath(Path value) {
+                this.venvPath = value;
+                return this;
+            }
+
+            /** Set environment variables for the Python process. */
+            public Builder env(Map<String, String> value) {
+                this.env = value;
+                return this;
+            }
+
+            public Options build() {
+                return new Options(timeoutMs,
+                        maxCodeLength, startupTimeoutMs, pythonExecutable,
+                        List.copyOf(warmupScripts), lenientWarmup,
+                        venvPath, env);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Builder
+    // ------------------------------------------------------------------
+
+    /**
+     * A builder for {@link PythonEmbed} that mirrors all configuration
+     * options directly, without requiring an intermediate {@link Options}
+     * object.
+     *
+     * <p>All fields default to the same values as {@link Options#defaults()}.
+     * Call {@link #build()} to create and initialize a new instance.
+     *
+     * <p>For pool usage, construct an {@link Options} separately via
+     * {@link Options#builder()} and pass to
+     * {@link PythonEmbedPool.Builder#options(Options)}.
+     */
+    public static final class Builder {
+        private long timeoutMs = 30_000;
+        private int maxCodeLength = 100_000;
+        private long startupTimeoutMs = 30_000;
+        private String pythonExecutable = null;
+        private final List<String> warmupScripts = new ArrayList<>();
+        private boolean lenientWarmup = true;
+        private Path venvPath = null;
+        private Map<String, String> env = Collections.emptyMap();
+
+        /** Set per-request timeout in milliseconds (default: 30_000). */
+        public Builder timeoutMs(long value) {
+            this.timeoutMs = value;
+            return this;
+        }
+
+        /** Set maximum code length in characters (default: 100_000). */
+        public Builder maxCodeLength(int value) {
+            this.maxCodeLength = value;
+            return this;
+        }
+
+        /** Set startup timeout in milliseconds (default: 30_000). */
+        public Builder startupTimeoutMs(long value) {
+            this.startupTimeoutMs = value;
+            return this;
+        }
+
+        /** Override the Python executable path (null for auto-detect). */
+        public Builder pythonExecutable(String value) {
+            this.pythonExecutable = value;
+            return this;
+        }
+
+        /** Append a warmup script to execute after instance initialization. */
+        public Builder warmupScript(String script) {
+            this.warmupScripts.add(script);
+            return this;
+        }
+
+        /** Append multiple warmup scripts at once. */
+        public Builder warmupScripts(List<String> scripts) {
+            this.warmupScripts.addAll(scripts);
+            return this;
+        }
+
+        /**
+         * Set whether warmup script failures should be logged as warnings
+         * instead of throwing exceptions. Default is {@code true}.
+         */
+        public Builder lenientWarmup(boolean value) {
+            this.lenientWarmup = value;
+            return this;
+        }
+
+        /** Set the explicit venv path (null for auto-discovery). */
+        public Builder venvPath(Path value) {
+            this.venvPath = value;
+            return this;
+        }
+
+        /** Set environment variables for the Python process. */
+        public Builder env(Map<String, String> value) {
+            this.env = value;
+            return this;
+        }
+
+        /**
+         * Builds and initializes a new {@link PythonEmbed} instance.
+         *
+         * @return a ready-to-use PythonEmbed instance
+         * @throws IOException if venv extraction or process startup fails
+         */
+        public PythonEmbed build() throws IOException {
+            Options opts = new Options(timeoutMs,
+                    maxCodeLength, startupTimeoutMs, pythonExecutable,
+                    List.copyOf(warmupScripts), lenientWarmup,
+                    venvPath, env);
+            return create(opts);
+        }
+    }
+
+    private Path extractBridge() throws IOException {
+        Path bridgeFile = Files.createTempFile("python-embed-bridge-", ".py");
+        try (InputStream is = getClass().getClassLoader()
+                .getResourceAsStream(BRIDGE_RESOURCE_PATH)) {
+            if (is == null) {
+                throw new IOException("bridge.py not found on classpath: " + BRIDGE_RESOURCE_PATH);
+            }
+            Files.copy(is, bridgeFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        Runtime.getRuntime().addShutdownHook(
+                new Thread(() -> {
+                    try {
+                        Files.deleteIfExists(bridgeFile);
+                    } catch (IOException ignored) {
+                    }
+                }, "bridge-cleanup"));
+        return bridgeFile;
+    }
+}
