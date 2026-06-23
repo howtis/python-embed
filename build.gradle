@@ -62,6 +62,12 @@ subprojects {
         dependsOn(tasks.matching { it.name == 'createVenv' })
     }
 
+    tasks.named('jar') {
+        metaInf {
+            from rootProject.file('LICENSE')
+        }
+    }
+
     tasks.withType(Test).configureEach {
         useJUnitPlatform()
         systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
