@@ -18,7 +18,7 @@ class PythonEmbedHealthIndicatorTest {
     @Test
     void singleModeUpWhenHealthy() {
         var embed = mock(PythonEmbed.class);
-        when(embed.health()).thenReturn(new HealthInfo(1024, 0, true, List.of(0, 0, 0)));
+        when(embed.health()).thenReturn(new HealthInfo(1024, 0, true, List.of(1, 2, 3)));
 
         var indicator = new PythonEmbedHealthIndicator.Single(embed);
         var health = indicator.health();
@@ -27,6 +27,7 @@ class PythonEmbedHealthIndicatorTest {
         assertThat(health.getDetails()).containsEntry("memoryRssKb", 1024L);
         assertThat(health.getDetails()).containsEntry("refCount", 0);
         assertThat(health.getDetails()).containsEntry("gcEnabled", true);
+        assertThat(health.getDetails()).containsEntry("gcCounts", List.of(1, 2, 3));
     }
 
     @Test
@@ -80,5 +81,16 @@ class PythonEmbedHealthIndicatorTest {
         var health = indicator.health();
 
         assertThat(health.getStatus()).isEqualTo(Status.UP);
+    }
+
+    @Test
+    void poolModeDownWhenException() {
+        var pool = mock(PythonEmbedPool.class);
+        when(pool.size()).thenThrow(new RuntimeException("pool unavailable"));
+
+        var indicator = new PythonEmbedHealthIndicator.Pool(pool);
+        var health = indicator.health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
     }
 }

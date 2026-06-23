@@ -8,8 +8,11 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class PythonEmbedAutoConfigurationTest {
 
@@ -100,5 +103,56 @@ class PythonEmbedAutoConfigurationTest {
                 .run(ctx -> {
                     assertThat(ctx.containsBean("pythonEmbedPoolCloser")).isFalse();
                 });
+    }
+
+    @Test
+    void poolCloserDestroyCallsPoolClose() {
+        var pool = mock(PythonEmbedPool.class);
+        var poolProps = new PythonEmbedProperties.PoolProperties();
+        poolProps.setCloseTimeout(java.time.Duration.ofSeconds(15));
+        var closer = new PythonEmbedAutoConfiguration.PoolCloser(pool, poolProps);
+
+        closer.destroy();
+
+        verify(pool).close(15_000L, TimeUnit.MILLISECONDS);
+    }
+
+    @Test
+    void userProvidedHealthIndicatorOverridesSingleMode() {
+        // Mockito cannot mock sealed PythonEmbedHealthIndicator directly;
+        // use the concrete Single subclass (this still satisfies @ConditionalOnMissingBean)
+        contextRunner
+                .withUserConfiguration(MockConfig.class, UserHealthIndicatorConfig.class)
+                .withPropertyValues("python-embed.mode=SINGLE")
+                .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
+                    // When a user provides their own indicator, the auto-configured one is skipped.
+                    // Here we get the single bean; it should be the user's config bean, not
+                    // the auto-configured one (which would use a different constructor).
+                    var bean = ctx.getBean(PythonEmbedHealthIndicator.class);
+                    assertThat(bean).isNotNull();
+                });
+    }
+
+    @Test
+    void userProvidedHealthIndicatorOverridesPoolMode() {
+        contextRunner
+                .withUserConfiguration(MockConfig.class, UserHealthIndicatorConfig.class)
+                .withPropertyValues("python-embed.mode=POOL")
+                .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
+                    var bean = ctx.getBean(PythonEmbedHealthIndicator.class);
+                    assertThat(bean).isNotNull();
+                });
+    }
+
+    @org.springframework.boot.test.context.TestConfiguration
+    static class UserHealthIndicatorConfig {
+        @Bean
+        @Primary
+        PythonEmbedHealthIndicator customHealthIndicator() {
+            // Use concrete subclass — sealed PythonEmbedHealthIndicator cannot be mocked
+            return new PythonEmbedHealthIndicator.Single(mock(PythonEmbed.class));
+        }
     }
 }

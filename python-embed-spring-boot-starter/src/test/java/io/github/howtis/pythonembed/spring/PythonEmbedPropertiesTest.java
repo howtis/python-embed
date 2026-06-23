@@ -1,6 +1,7 @@
 package io.github.howtis.pythonembed.spring;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
@@ -8,6 +9,7 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PythonEmbedPropertiesTest {
 
@@ -75,6 +77,21 @@ class PythonEmbedPropertiesTest {
         var opts = props.getOptions();
         assertThat(opts.getTimeoutMs()).isEqualTo(60_000L);
         assertThat(opts.getEnvironmentVars()).containsEntry("KEY1", "val1").containsEntry("KEY2", "val2");
+    }
+
+    @Test
+    void invalidModeThrowsBindException() {
+        var source = new MapConfigurationPropertySource(Map.of("python-embed.mode", "INVALID"));
+        var binder = new Binder(source);
+        assertThatThrownBy(() -> binder.bindOrCreate("python-embed", PythonEmbedProperties.class))
+                .isInstanceOf(BindException.class);
+    }
+
+    @Test
+    void negativePoolMinPropagates() {
+        var props = bind(Map.of("python-embed.pool.min", "-1"));
+        // Spring Boot does not validate numeric ranges; the value propagates as-is
+        assertThat(props.getPool().getMin()).isEqualTo(-1);
     }
 
     private static PythonEmbedProperties bind(Map<String, String> source) {
