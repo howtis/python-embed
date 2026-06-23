@@ -898,4 +898,63 @@ class PythonEmbedIntegrationTest {
         PythonValue secondScore = py.eval("data[0]['scores'][1]");
         assertEquals(85.0, secondScore.asDouble(), 0.001);
     }
+
+    // ---- warmupScripts(List) ----
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void warmupScripts_multipleScripts_viaBuilder() {
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .warmupScripts(List.of("import math", "import json"))
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
+        try {
+            // Both imports should have executed
+            PythonValue pi = embed.eval("math.pi");
+            assertEquals(3.141592653589793, pi.asDouble(), 0.0001);
+            String result = embed.eval("json.dumps({'key': 'value'})").asString();
+            assertTrue(result.contains("key"));
+        } finally {
+            embed.close();
+        }
+    }
+
+    // ---- getPid() ----
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void getPid_returnsPositiveWhileRunning() {
+        long pid = py.getPid();
+        assertTrue(pid > 0, "Expected positive PID, got: " + pid);
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void getPid_afterClose_stillReturnsPid() {
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
+        long pid = embed.getPid();
+        assertTrue(pid > 0, "Embed should have valid PID while open");
+        embed.close();
+        // After close, getPid() still returns the historical PID;
+        // isOpen() is the authoritative closed-state check.
+        assertEquals(pid, embed.getPid());
+        assertFalse(embed.isOpen());
+    }
+
+    // ---- stream() edge cases ----
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void stream_afterClose_throwsException() {
+        PythonEmbed embed = PythonEmbed.create(
+                PythonEmbed.Options.builder()
+                        .venvPath(Path.of("build", "python-venv"))
+                        .build());
+        embed.close();
+        assertThrows(PythonExecutionException.class, () -> embed.stream("range(3)"));
+    }
 }
