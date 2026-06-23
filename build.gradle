@@ -59,8 +59,8 @@ subprojects {
     }
 
     tasks.named('sourcesJar') {
-        dependsOn(tasks.named('generatePythonEmbedProperties'))
-        dependsOn(tasks.named('createVenv'))
+        dependsOn(tasks.matching { it.name == 'generatePythonEmbedProperties' })
+        dependsOn(tasks.matching { it.name == 'createVenv' })
     }
 
     tasks.withType(Test).configureEach {
