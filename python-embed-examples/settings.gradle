@@ -3,6 +3,8 @@ rootProject.name = 'python-embed-examples'
 includeBuild '../python-embed-gradle-plugin'
 include ':python-embed-runtime'
 project(':python-embed-runtime').projectDir = file('../python-embed-runtime')
+include ':python-embed-spring-boot-starter'
+project(':python-embed-spring-boot-starter').projectDir = file('../python-embed-spring-boot-starter')
 
 include 'basic-eval'
 include 'numpy-basic'
@@ -16,3 +18,4 @@ include 'object-handle'
 include 'health-monitor'
 include 'batch-operations'
 include 'pandas-dataframe'
+include 'spring-boot-example'

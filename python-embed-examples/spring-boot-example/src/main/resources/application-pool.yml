@@ -1,0 +1,17 @@
+python-embed:
+  mode: POOL
+  pool:
+    min: 2
+    max: 4
+    idle-timeout: 60s
+    health-check-interval: 30s
+    close-timeout: 10s
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info

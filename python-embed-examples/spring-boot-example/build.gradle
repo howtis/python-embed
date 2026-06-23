@@ -1,0 +1,20 @@
+plugins {
+    id 'io.github.howtis.python-embed'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+application {
+    mainClass = 'io.github.howtis.pythonembed.examples.SpringBootExampleApplication'
+}
+
+dependencies {
+    implementation project(':python-embed-runtime')
+    implementation project(':python-embed-spring-boot-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+}
+
+pythonEmbed {
+    packages = ['msgpack']
+}
