@@ -3,7 +3,7 @@ subprojects {
     apply plugin: 'application'
 
     group = 'io.github.howtis'
-    version = '1.0.0-SNAPSHOT'
+    version = '1.0.0'
 
     repositories {
         mavenCentral()

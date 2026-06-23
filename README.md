@@ -1,7 +1,5 @@
 # PythonEmbed
 
-> [!WARNING]
-> **Pre-release (SNAPSHOT)** — This project has not yet been released. APIs may change without notice. Not suitable for production use.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -42,17 +40,20 @@ That's it. The Gradle plugin handles Python installation, venv creation, and pac
 - **Crash isolation** — Python segfaults never kill the JVM; each Python process runs independently
 - **Binary protocol** — MessagePack with length-prefixed frames
 - **Auto-scaling pool** — `PythonEmbedPool` with async `CompletableFuture` API, scales between `minPool` and `maxPool`
-- **Object handles** — keep Python objects in-process, reference by numeric ID across calls
+- **Object handles** — keep Python objects in-process, reference by numeric ID across calls via `ref()`
 - **Java proxies** — wrap Python objects as Java interfaces via dynamic proxies with automatic camelCase→snake_case conversion
 - **Callbacks** — Python-to-Java callbacks via `_bridge.call()` and fire-and-forget pushes via `_bridge.push()`
 - **Streaming** — generator/yield results via Java `Iterator`
-- **Type-safe arguments** — `PythonEmbed.arg()` converts Java types to Python literals with injection protection
+- **Type-safe arguments** — `PythonEmbed.arg()` converts Java types (null, Boolean, Number, String, List, Set, Map, byte[], datetime) to Python literals with injection protection
 - **Batch execution** — `batchEval`/`batchExec` send multiple requests in a single round-trip
+- **File execution** — `execFile(Path)` executes Python files directly
 - **Auto-restart** — `minPool` guarantee on crash; unhealthy instances are replaced automatically
-- **Health check** — periodic ping/pong with RSS memory, ref count, and GC status reporting
+- **Health check** — periodic ping/pong with RSS memory, ref count, and GC status reporting via `health()` and `ping()`
 - **Python auto-download** — [python-build-standalone](https://github.com/astral-sh/python-build-standalone) when system Python is absent
 - **Incremental venv** — rebuild only on dependency changes
 - **Python log forwarding** — Python `logging` routed to SLF4J via `python.*` logger namespace
+- **Close hooks** — `onBeforeClose` / `onAfterClose` callbacks for resource cleanup
+- **Spring Boot integration** — zero-code auto-configuration with SINGLE/POOL modes and Actuator `HealthIndicator`
 
 ## Installation
 
@@ -111,6 +112,33 @@ try (PythonEmbed py = PythonEmbed.create()) {
 }
 ```
 
+### Execute Python Files
+
+```java
+try (PythonEmbed py = PythonEmbed.create()) {
+    // Execute a Python script file directly
+    py.execFile(Path.of("scripts/data_pipeline.py"));
+
+    // Access variables defined by the script
+    PythonValue result = py.eval("processed_data");
+}
+```
+
+### Variables & Object Handles
+
+```java
+try (PythonEmbed py = PythonEmbed.create()) {
+    // Pass Java variables to Python
+    py.eval(Map.of("a", 10, "b", 20), "a + b");  // 30
+
+    // Get a persistent handle to a Python object
+    PythonHandle handle = py.ref("np");
+
+    // Use the handle later (survives across eval/exec calls)
+    PythonValue arr = py.eval("np.arange(5).tolist()");
+}
+```
+
 ### Safe Parameter Injection
 
 Use `PythonEmbed.arg()` to safely inject Java values into Python code — no risk of injection:
@@ -124,7 +152,10 @@ PythonEmbed.arg("hello");        // 'hello'
 PythonEmbed.arg(42);             // 42
 PythonEmbed.arg(true);           // True
 PythonEmbed.arg(List.of(1, 2));  // [1, 2]
+PythonEmbed.arg(Set.of(1, 2));   // {1, 2}
 PythonEmbed.arg(Map.of("k", 1)); // {'k': 1}
+PythonEmbed.arg(new byte[]{1,2});// b'\x01\x02'
+PythonEmbed.arg(Instant.now());  // datetime.datetime.fromtimestamp(...)
 ```
 
 ### Configuration
@@ -136,6 +167,7 @@ PythonEmbed.Options options = PythonEmbed.Options.builder()
     .venvPath(Path.of("/opt/venv"))  // explicit venv path
     .env(Map.of("CUDA_VISIBLE_DEVICES", "0"))
     .warmupScript("import numpy as np")
+    .onBeforeClose(py -> py.exec("cleanup()"))
     .build();
 
 try (PythonEmbed py = PythonEmbed.create(options)) {
@@ -166,6 +198,12 @@ try (PythonEmbedPool pool = PythonEmbedPool.builder()
         System.out.println(results.get(0).asInt());
         System.out.println(results.get(1).asInt());
     });
+
+    // Batch exec (fire-and-forget)
+    pool.batchExec(List.of(
+        "print('task 1')",
+        "print('task 2')"
+    )).get();
 
     // Monitor pool
     System.out.println("Size: " + pool.size());
@@ -246,9 +284,60 @@ try {
     py.eval("1 / 0");
 } catch (PythonExecutionException e) {
     System.out.println("Python error: " + e.getMessage());
-    System.out.println("Cause code: " + e.causeCode());
-    System.out.println("Error type: " + e.errorType());
-    System.out.println("Traceback:\n" + e.traceback());
+    System.out.println("Cause code: " + e.getCauseCode());
+    System.out.println("Error type: " + e.getPythonErrorType());
+    System.out.println("Traceback:\n" + e.getPythonTraceback());
+}
+```
+
+## Spring Boot
+
+Add `python-embed-spring-boot-starter` for zero-code Spring Boot 3.x integration:
+
+```groovy
+dependencies {
+    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.0'
+}
+```
+
+Configure via `application.yml`:
+
+```yaml
+python-embed:
+  mode: SINGLE          # or POOL
+  venv-path: /opt/venv  # optional override
+  pool:
+    min: 2
+    max: 8
+    idle-timeout: 60s
+    health-check-interval: 30s
+    close-timeout: 30s
+  options:
+    timeout-ms: 30000
+    environment-vars:
+      CUDA_VISIBLE_DEVICES: "0"
+
+management:
+  endpoint:
+    health:
+      show-details: always
+```
+
+**SINGLE mode** injects a `PythonEmbed` bean. **POOL mode** injects a `PythonEmbedPool` bean. Both modes register an Actuator `HealthIndicator`.
+
+```java
+@RestController
+public class PythonController {
+    private final PythonEmbed py;
+
+    public PythonController(PythonEmbed py) {
+        this.py = py;
+    }
+
+    @GetMapping("/eval")
+    public Map<String, Object> eval(@RequestParam String expr) {
+        return Map.of("result", py.eval(expr).toJson());
+    }
 }
 ```
 
@@ -263,6 +352,8 @@ try {
 
 - **[python-embed-gradle-plugin](python-embed-gradle-plugin/)** — Gradle plugin for venv creation, package installation, and Python auto-download
 - **[python-embed-runtime](python-embed-runtime/)** — Java runtime library for process communication, pool management, and type conversion
+- **[python-embed-spring-boot-starter](python-embed-spring-boot-starter/)** — Spring Boot 3.x auto-configuration (SINGLE/POOL modes, HealthIndicator)
+- **[python-embed-examples](python-embed-examples/)** — 13 real-world examples (eval, numpy, pool-async, callback-bridge, proxy-object, streaming, spring-boot, and more)
 
 ## Building from Source
 
