@@ -1,5 +1,8 @@
 # PythonEmbed
 
+> [!WARNING]
+> **Pre-release (SNAPSHOT)** — This project has not yet been released. APIs may change without notice. Not suitable for production use.
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Run Python code from Java — with full CPython compatibility and zero setup.
