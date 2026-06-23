@@ -16,7 +16,7 @@ obsidian vault="agent-memory" read path="Projects/python-embed.md"
 
 - All documentation must be managed within Obsidian. Do not leave any documentation within the project.
 
-- **Decision made** → create `Decisions/{title}.md`
+- **Decision made** → read `Projects/vault-naming-convention.md` → create `Decisions/{title}.md`
 - **Task completed/created** → update `Tasks/active.md`, `Tasks/completed.md`
 
 ### Session End
