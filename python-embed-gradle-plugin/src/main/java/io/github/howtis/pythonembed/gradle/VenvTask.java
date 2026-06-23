@@ -93,6 +93,10 @@ public abstract class VenvTask extends DefaultTask {
     @TaskAction
     public void createVenv() {
         List<String> packages = new ArrayList<>(getPackages().get());
+        // msgpack is always required by bridge.py, auto-include
+        if (!packages.contains("msgpack")) {
+            packages.add("msgpack");
+        }
         String requirementsFile = getRequirementsFile().getOrNull();
         String pyprojectTomlFile = getPyprojectTomlFile().getOrNull();
 

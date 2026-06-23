@@ -15,6 +15,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 }
 
-pythonEmbed {
-    packages = ['msgpack']
+tasks.register('prepareKotlinBuildScriptModel') {
 }
+

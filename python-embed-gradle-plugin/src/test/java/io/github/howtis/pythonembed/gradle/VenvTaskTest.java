@@ -152,9 +152,10 @@ class VenvTaskTest {
         Files.createFile(scriptsDir.resolve("python.exe"));
 
         // Set packages and compute expected fingerprint
+        // msgpack is auto-added by VenvTask, so include it in the expected hash
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
-        String expectedHash = task.computePackageHash(packages, null, List.of(), null);
+        String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
 
         // Write matching fingerprint file
         Properties fp = new Properties();

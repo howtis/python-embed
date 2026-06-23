@@ -12,5 +12,5 @@ dependencies {
 }
 
 pythonEmbed {
-    packages = ['pandas', 'msgpack']
+    packages = ['pandas']
 }

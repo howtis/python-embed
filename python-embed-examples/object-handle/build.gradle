@@ -12,5 +12,5 @@ dependencies {
 }
 
 pythonEmbed {
-    packages = ['msgpack','numpy']
+    packages = ['numpy']
 }
