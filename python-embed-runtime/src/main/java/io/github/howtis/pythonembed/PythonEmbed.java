@@ -777,8 +777,9 @@ public class PythonEmbed implements AutoCloseable {
                 Runtime.getRuntime().removeShutdownHook(processCleanupHook);
             } catch (Exception ignored) {
                 // Hook may have already run or been removed
+            } finally {
+                processCleanupHook = null;
             }
-            processCleanupHook = null;
         }
 
         // Release all tracked handles

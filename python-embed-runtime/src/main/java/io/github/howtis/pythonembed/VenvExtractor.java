@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,6 +27,7 @@ class VenvExtractor implements AutoCloseable {
 
     private Path tempDir;
     private boolean closed;
+    private final AtomicBoolean hookRegistered = new AtomicBoolean();
 
     /**
      * Extracts the given classpath resource directory into a temporary location.
@@ -58,7 +60,9 @@ class VenvExtractor implements AutoCloseable {
             copyDirectory(sourceDir, tempDir);
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::cleanupTempDir, "venv-cleanup"));
+        if (hookRegistered.compareAndSet(false, true)) {
+            Runtime.getRuntime().addShutdownHook(new Thread(this::cleanupTempDir, "venv-cleanup"));
+        }
 
         logger.info("Venv extraction complete: " + tempDir);
         return tempDir;

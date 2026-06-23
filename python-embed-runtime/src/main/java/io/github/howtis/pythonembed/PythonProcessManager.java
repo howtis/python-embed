@@ -179,7 +179,13 @@ class PythonProcessManager {
      * @param forceWaitMs maximum time to wait after force-destroy in milliseconds
      */
     void close(long waitMs, long forceWaitMs) {
-        running = false;
+        // Synchronized to match the block in stdinWriter(), ensuring
+        // that any thread currently writing to stdin will either see
+        // running==false or complete its write before we proceed to
+        // shut down the process.
+        synchronized (this) {
+            running = false;
+        }
 
         // Try graceful exit first
         if (process != null && process.isAlive()) {
@@ -215,6 +221,9 @@ class PythonProcessManager {
         } catch (IOException ignored) {
         }
 
+        // Cancel any remaining pending futures. This is done after
+        // process.waitFor() and stream cleanup to ensure all
+        // outstanding I/O operations have been resolved first.
         protocol.cancelAll(new RuntimeException("Python process closed"));
     }
 

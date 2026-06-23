@@ -14,6 +14,8 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,6 +73,8 @@ public class PythonEmbedPool implements AutoCloseable {
     private final ScheduledExecutorService maintenanceExecutor;
     private final AtomicInteger currentSize;
     private final Semaphore instanceSemaphore;
+    private final ReentrantLock instanceLock = new ReentrantLock();
+    private final Condition instanceAvailable = instanceLock.newCondition();
     private volatile long lastHealthCheckAt;
     private volatile boolean closed;
 
@@ -88,6 +92,7 @@ public class PythonEmbedPool implements AutoCloseable {
         final PythonEmbed embed;
         volatile boolean busy;
         volatile long lastUsedAt;
+        volatile boolean removed;
 
         PooledInstance(PythonEmbed embed) {
             this.embed = embed;
@@ -522,18 +527,50 @@ public class PythonEmbedPool implements AutoCloseable {
     }
 
     /**
+     * Creates a dynamic proxy that wraps a Python object identified by
+     * its {@link PythonHandle} as a Java interface. Method calls are
+     * routed directly to the owning {@link PythonEmbed} instance.
+     *
+     * <p>Unlike {@link #proxy(int, Class)}, this method does not acquire
+     * a pool instance per call -- the proxy is pinned to the handle's
+     * owning Python process, ensuring correct refId resolution.
+     *
+     * @param <T>            the interface type
+     * @param handle         the Python object handle (must not be released)
+     * @param interfaceClass the Java interface to proxy
+     * @return a dynamic proxy implementing the given interface
+     * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T proxy(PythonHandle handle, Class<T> interfaceClass) {
+        if (!interfaceClass.isInterface()) {
+            throw new IllegalArgumentException(
+                    "proxy() requires an interface, got: " + interfaceClass.getName());
+        }
+        handle.checkNotReleased();
+        PythonEmbed embed = handle.owner();
+        return (T) java.lang.reflect.Proxy.newProxyInstance(
+                interfaceClass.getClassLoader(),
+                new Class<?>[]{interfaceClass},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return method.invoke(this, args);
+                    }
+                    return new PythonProxy(
+                            embed.protocol, embed.writer, handle.refId(),
+                            embed.options.timeoutMs())
+                            .invokePython(method, args);
+                });
+    }
+
+    /**
      * Creates a dynamic proxy that wraps a Python object as a Java interface,
      * with each method call acquiring and releasing a pool instance.
      *
-     * <p>Unlike {@link PythonEmbed#proxy(int, Class)}, this proxy is not
-     * tied to a single PythonEmbed instance. Each method invocation
-     * acquires an available instance from the pool, executes the call,
-     * and releases the instance back. This gives proxy users the full
-     * benefits of pool auto-scaling and health checks.
      *
      * <pre>{@code
      * PythonHandle handle = pool.ref("my_object").get();
-     * MyInterface obj = pool.proxy(handle.getRefId(), MyInterface.class);
+     * MyInterface obj = pool.proxy(handle, MyInterface.class);
      * String result = obj.process("input");
      * }</pre>
      *
@@ -573,7 +610,8 @@ public class PythonEmbedPool implements AutoCloseable {
      * Shortcut that wraps a Python variable as a Java interface proxy
      * in a single call.
      *
-     * <p>Equivalent to {@code proxy(ref(name).join().refId(), interfaceClass)}.
+     * <p>The proxy is pinned to the Python process that owns the variable,
+     * ensuring correct refId resolution across all method calls.
      *
      * <pre>{@code
      * pool.exec("class Calc:\n    def add(self, a, b): return a + b\ncalc = Calc()");
@@ -591,7 +629,7 @@ public class PythonEmbedPool implements AutoCloseable {
     @SuppressWarnings("unchecked")
     public <T> T proxy(String variableName, Class<T> interfaceClass) {
         PythonHandle handle = ref(variableName).join();
-        return proxy(handle.refId(), interfaceClass);
+        return proxy(handle, interfaceClass);
     }
 
     /**
@@ -603,6 +641,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @param handler the handler that receives args and returns a value
      */
     public void registerCallback(String name, CallbackHandler handler) {
+        if (closed) throw new IllegalStateException("Pool is closed");
         callbackHandlers.put(name, handler);
         callbackArgTypes.remove(name);
         for (PooledInstance pi : instances) {
@@ -619,6 +658,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @param handler  the handler that receives converted args
      */
     public void registerCallback(String name, Class<?>[] argTypes, CallbackHandler handler) {
+        if (closed) throw new IllegalStateException("Pool is closed");
         callbackHandlers.put(name, handler);
         callbackArgTypes.put(name, argTypes);
         for (PooledInstance pi : instances) {
@@ -635,6 +675,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @param handler the handler that receives name and value
      */
     public void registerPushHandler(String name, PushHandler handler) {
+        if (closed) throw new IllegalStateException("Pool is closed");
         pushHandlers.put(name, handler);
         pushValueTypes.remove(name);
         for (PooledInstance pi : instances) {
@@ -653,6 +694,7 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     @SuppressWarnings("unchecked")
     public <T> void registerPushHandler(String name, Class<T> valueType, PushHandler<T> handler) {
+        if (closed) throw new IllegalStateException("Pool is closed");
         PushHandler wrapped = (n, v) -> {
             try {
                 handler.accept(n, PythonValue.convertValue(v, valueType));
@@ -774,8 +816,18 @@ public class PythonEmbedPool implements AutoCloseable {
             // Hook may have already run or been removed
         }
 
-        // Stop accepting new work
-        maintenanceExecutor.shutdownNow();
+        // Stop accepting new work.
+        // Graceful shutdown first to let in-flight maintenance complete,
+        // then force-shutdown after a short timeout.
+        maintenanceExecutor.shutdown();
+        try {
+            if (!maintenanceExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                maintenanceExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            maintenanceExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
         executor.shutdown();
 
         // Close all instances with the given timeout
@@ -847,7 +899,7 @@ public class PythonEmbedPool implements AutoCloseable {
                         pi.lastUsedAt = System.currentTimeMillis();
                         instances.add(pi);
                         return pi;
-                    } catch (PythonExecutionException e) {
+                    } catch (Exception e) {
                         currentSize.decrementAndGet();
                         instanceSemaphore.release();
                         throw e;
@@ -860,8 +912,18 @@ public class PythonEmbedPool implements AutoCloseable {
             // 3. At maxPool but no idle instance found yet.
             //    This is a rare transient race: the semaphore says a slot
             //    is free, but the corresponding instance hasn't been marked
-            //    idle yet. Yield and retry.
-            Thread.yield();
+            //    idle yet. Wait for a release signal with a short timeout
+            //    to avoid a pure busy-wait.
+            instanceLock.lock();
+            try {
+                instanceAvailable.await(100, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                instanceSemaphore.release();
+                throw PythonExecutionException.wrap("acquireInstance", e);
+            } finally {
+                instanceLock.unlock();
+            }
         }
     }
 
@@ -872,6 +934,12 @@ public class PythonEmbedPool implements AutoCloseable {
         pi.busy = false;
         pi.lastUsedAt = System.currentTimeMillis();
         instanceSemaphore.release();
+        instanceLock.lock();
+        try {
+            instanceAvailable.signal();
+        } finally {
+            instanceLock.unlock();
+        }
     }
 
     /**
@@ -943,8 +1011,11 @@ public class PythonEmbedPool implements AutoCloseable {
             if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                 synchronized (pi) {
                     if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
+                        if (pi.removed) continue;
+                        pi.removed = true;
                         if (currentSize.decrementAndGet() >= minPool) {
                             it.remove();
+                            instanceSemaphore.release();
                             notifyInstanceRemoved(pi.embed, CloseReason.POOL_CLEANUP);
                             try {
                                 pi.embed.close();
@@ -1001,9 +1072,10 @@ public class PythonEmbedPool implements AutoCloseable {
 
             if (!healthy) {
                 synchronized (pi) {
-                    if (!pi.busy) {
+                    if (!pi.busy && !pi.removed) {
+                        pi.removed = true;
                         it.remove();
-                        removed++;
+                        removed++;                        
                         currentSize.decrementAndGet();
                         instanceSemaphore.release();
                         notifyInstanceRemoved(pi.embed, CloseReason.HEALTH_CHECK);
@@ -1036,7 +1108,7 @@ public class PythonEmbedPool implements AutoCloseable {
                 try {
                     PythonEmbed embed = createEmbed();
                     instances.add(new PooledInstance(embed));
-                } catch (PythonExecutionException e) {
+                } catch (Exception e) {
                     currentSize.decrementAndGet();
                     logger.log(Level.WARNING,
                             "Failed to create instance for minPool guarantee", e);

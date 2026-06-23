@@ -43,7 +43,10 @@ public class PythonHandle implements AutoCloseable {
         this.refId = refId;
         this.pythonType = pythonType;
         this.released = false;
+        registerCleaner();
+    }
 
+    private void registerCleaner() {
         cleaner.register(this, () -> {
             if (!released && owner.isOpen()) {
                 try {
@@ -53,6 +56,9 @@ public class PythonHandle implements AutoCloseable {
             }
         });
     }
+
+    /** Returns the {@link PythonEmbed} that owns this handle. */
+    PythonEmbed owner() { return owner; }
 
     /** The numeric reference ID in the Python process. */
     public int refId() { return refId; }
@@ -107,7 +113,7 @@ public class PythonHandle implements AutoCloseable {
         release();
     }
 
-    private void checkNotReleased() {
+    void checkNotReleased() {
         if (released) {
             throw new IllegalStateException("PythonHandle already released");
         }

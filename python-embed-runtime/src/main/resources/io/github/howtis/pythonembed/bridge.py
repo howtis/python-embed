@@ -444,7 +444,7 @@ def read_frame(stream):
 
 def write_frame(stream, obj):
     """Write a dict as a length-prefixed MessagePack frame to a binary stream."""
-    data = msgpack.packb(obj, default=str)
+    data = msgpack.packb(obj)
     length = len(data)
     stream.write(struct.pack('>I', length))
     stream.write(data)
