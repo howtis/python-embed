@@ -1,5 +1,7 @@
 package io.github.howtis.pythonembed;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -330,6 +332,166 @@ public class PythonEmbedPool implements AutoCloseable {
             try {
                 pi = acquireInstance();
                 pi.embed.exec(code, timeoutMs);
+                return null;
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes a Python script from a file asynchronously.
+     *
+     * @param scriptPath path to the Python script file
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> execFile(Path scriptPath) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.execFile(scriptPath);
+                return null;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes a Python script from a file with a per-call timeout override.
+     *
+     * @param scriptPath path to the Python script file
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> execFile(Path scriptPath, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.execFile(scriptPath, timeoutMs);
+                return null;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Evaluates a Python expression with variable bindings asynchronously.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python expression to evaluate
+     * @return a future that completes with the result
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<PythonValue> eval(Map<String, Object> variables, String code) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                return pi.embed.eval(variables, code);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Evaluates a Python expression with variable bindings and a per-call
+     * timeout override.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python expression to evaluate
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes with the result
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<PythonValue> eval(Map<String, Object> variables, String code, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                return pi.embed.eval(variables, code, timeoutMs);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes Python statements with variable bindings asynchronously.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python statements to execute
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> exec(Map<String, Object> variables, String code) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.exec(variables, code);
+                return null;
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
+    }
+
+    /**
+     * Executes Python statements with variable bindings and a per-call
+     * timeout override.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python statements to execute
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return a future that completes when execution finishes
+     * @throws IllegalStateException if the pool is closed
+     */
+    public CompletableFuture<Void> exec(Map<String, Object> variables, String code, long timeoutMs) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                pi.embed.exec(variables, code, timeoutMs);
                 return null;
             } catch (Exception e) {
                 throw new CompletionException(e);

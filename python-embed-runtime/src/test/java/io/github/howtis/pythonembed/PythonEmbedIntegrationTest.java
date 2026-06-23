@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -943,6 +945,139 @@ class PythonEmbedIntegrationTest {
         // isOpen() is the authoritative closed-state check.
         assertEquals(pid, embed.getPid());
         assertFalse(embed.isOpen());
+    }
+
+    // ---- toJson() from eval ----
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void toJson_dictFromPython() {
+        py.exec("import json");
+        PythonValue v = py.eval("json.loads('{\"name\": \"Alice\", \"age\": 30}')");
+        String json = v.toJson();
+        assertTrue(json.contains("\"name\""));
+        assertTrue(json.contains("\"Alice\""));
+        assertTrue(json.contains("\"age\""));
+        assertTrue(json.contains("30"));
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void toJson_listFromPython() {
+        PythonValue v = py.eval("[1, 2, 3]");
+        assertEquals("[1, 2, 3]", v.toJson());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void toJson_primitiveFromPython() {
+        PythonValue v = py.eval("42");
+        assertEquals("42", v.toJson());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void toJson_nullFromPython() {
+        PythonValue v = py.eval("None");
+        assertEquals("null", v.toJson());
+    }
+
+    // ---- execFile ----
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void execFile_simpleScript() throws Exception {
+        Path scriptFile = Files.createTempFile("pyembed-test", ".py");
+        try {
+            Files.writeString(scriptFile, "x = 42\ny = 58");
+            py.execFile(scriptFile);
+            assertEquals(100, py.eval("x + y").asInt());
+        } finally {
+            Files.deleteIfExists(scriptFile);
+        }
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void execFile_withTimeoutOverride() throws Exception {
+        Path scriptFile = Files.createTempFile("pyembed-test", ".py");
+        try {
+            Files.writeString(scriptFile, "z = 99");
+            py.execFile(scriptFile, 10_000);
+            assertEquals(99, py.eval("z").asInt());
+        } finally {
+            Files.deleteIfExists(scriptFile);
+        }
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void execFile_fileNotFound_throwsIOException() {
+        Path missing = Path.of("nonexistent_script_12345.py");
+        assertThrows(IOException.class, () -> py.execFile(missing));
+    }
+
+    // ---- eval(Map) with variables ----
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void eval_withVariables_simpleMath() {
+        PythonValue result = py.eval(Map.of("x", 10, "y", 20), "x + y");
+        assertEquals(30, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void eval_withVariables_stringManipulation() {
+        PythonValue result = py.eval(
+                Map.of("name", "World"), "'Hello, ' + name");
+        assertEquals("Hello, World", result.asString());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void eval_withVariables_emptyMap() {
+        PythonValue result = py.eval(Map.of(), "1 + 1");
+        assertEquals(2, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void eval_withVariables_andTimeout() {
+        PythonValue result = py.eval(Map.of("a", 5), "a * a", 10_000);
+        assertEquals(25, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void exec_withVariables_stateIsPreserved() {
+        py.exec(Map.of("greeting", "hi"), "result = greeting + ' there'");
+        assertEquals("hi there", py.eval("result").asString());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void exec_withVariables_andTimeout() {
+        py.exec(Map.of("n", 7), "s = n * n", 10_000);
+        assertEquals(49, py.eval("s").asInt());
+    }
+
+    // ---- Datetime eval round-trip ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void arg_localDateTime_roundtrip() {
+        py.warmup("import datetime");
+        LocalDateTime dt = LocalDateTime.of(2024, 6, 15, 14, 30, 0, 0);
+        py.exec("result = " + PythonEmbed.arg(dt));
+        PythonValue year = py.eval("result.year");
+        assertEquals(2024, year.asInt());
+        PythonValue month = py.eval("result.month");
+        assertEquals(6, month.asInt());
+        PythonValue day = py.eval("result.day");
+        assertEquals(15, day.asInt());
+        PythonValue hour = py.eval("result.hour");
+        assertEquals(14, hour.asInt());
     }
 
     // ---- stream() edge cases ----

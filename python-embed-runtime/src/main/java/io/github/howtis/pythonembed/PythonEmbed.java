@@ -4,6 +4,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -346,6 +351,180 @@ public class PythonEmbed implements AutoCloseable {
         } catch (TimeoutException | IOException e) {
             throw PythonExecutionException.wrap("exec", e);
         }
+    }
+
+    /**
+     * Executes a Python script from a file.
+     *
+     * <p>Reads the entire file contents and executes them via {@link #exec(String)}.
+     * State is preserved across calls (shared namespace), allowing multi-file
+     * scripts to share variables and imports.
+     *
+     * @param scriptPath path to the Python script file
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
+     * @throws IOException if the file cannot be read
+     */
+    public void execFile(Path scriptPath) throws IOException {
+        String code = Files.readString(scriptPath);
+        exec(code);
+    }
+
+    /**
+     * Executes a Python script from a file with a per-call timeout override.
+     *
+     * @param scriptPath path to the Python script file
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
+     * @throws IOException if the file cannot be read
+     */
+    public void execFile(Path scriptPath, long timeoutMs) throws IOException {
+        String code = Files.readString(scriptPath);
+        exec(code, timeoutMs);
+    }
+
+    /**
+     * Evaluates a Python expression with variable bindings.
+     *
+     * <p>Each entry in {@code variables} is assigned to a Python global
+     * variable before evaluating the expression. The keys are the variable
+     * names, and the values are converted to Python literals via
+     * {@link #arg(Object)}.
+     *
+     * <p>This requires two round-trips: the first uses {@code exec()} to
+     * assign the variables, and the second uses {@code eval()} for the
+     * expression. The variable assignments persist in the Python namespace.
+     *
+     * <pre>{@code
+     * PythonValue result = py.eval(
+     *     Map.of("x", 10, "y", 20),
+     *     "x + y");
+     * // result.asInt() == 30
+     * }</pre>
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python expression to evaluate
+     * @return the result wrapped in PythonValue
+     * @throws PythonExecutionException if Python evaluation fails,
+     *         communication with the Python process fails, or the request times out
+     */
+    public PythonValue eval(Map<String, Object> variables, String code) {
+        if (variables.isEmpty()) {
+            try {
+                return protocol.sendEval(writer, code);
+            } catch (TimeoutException | IOException e) {
+                throw PythonExecutionException.wrap("eval", e);
+            }
+        }
+        String assignCode = buildAssignments(variables);
+        try {
+            protocol.sendExec(writer, assignCode);
+            return protocol.sendEval(writer, code);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("eval", e);
+        }
+    }
+
+    /**
+     * Evaluates a Python expression with variable bindings and a per-call
+     * timeout override.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python expression to evaluate
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @return the result wrapped in PythonValue
+     * @throws PythonExecutionException if Python evaluation fails,
+     *         communication with the Python process fails, or the request times out
+     */
+    public PythonValue eval(Map<String, Object> variables, String code, long timeoutMs) {
+        if (variables.isEmpty()) {
+            try {
+                return protocol.sendEval(writer, code, timeoutMs);
+            } catch (TimeoutException | IOException e) {
+                throw PythonExecutionException.wrap("eval", e);
+            }
+        }
+        String assignCode = buildAssignments(variables);
+        try {
+            protocol.sendExec(writer, assignCode, timeoutMs);
+            return protocol.sendEval(writer, code, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("eval", e);
+        }
+    }
+
+    /**
+     * Executes Python statements with variable bindings.
+     *
+     * <p>Each entry in {@code variables} is assigned to a Python global
+     * variable before executing the statements.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python statements to execute
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
+     */
+    public void exec(Map<String, Object> variables, String code) {
+        String fullCode = buildWithVariables(variables, code);
+        try {
+            protocol.sendExec(writer, fullCode);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("exec", e);
+        }
+    }
+
+    /**
+     * Executes Python statements with variable bindings and a per-call
+     * timeout override.
+     *
+     * @param variables map of variable names to Java values
+     * @param code Python statements to execute
+     * @param timeoutMs timeout in milliseconds for this call;
+     *                  when &lt;= 0, uses the configured default timeout
+     * @throws PythonExecutionException if Python execution fails,
+     *         communication with the Python process fails, or the request times out
+     */
+    public void exec(Map<String, Object> variables, String code, long timeoutMs) {
+        String fullCode = buildWithVariables(variables, code);
+        try {
+            protocol.sendExec(writer, fullCode, timeoutMs);
+        } catch (TimeoutException | IOException e) {
+            throw PythonExecutionException.wrap("exec", e);
+        }
+    }
+
+    /**
+     * Builds Python assignment statements from variable bindings.
+     * Each variable is assigned using {@link #arg(Object)} for safe literal
+     * conversion. Used by both {@link #eval(Map, String)} and
+     * {@link #exec(Map, String)}.
+     */
+    static String buildAssignments(Map<String, Object> variables) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> entry : variables.entrySet()) {
+            sb.append(entry.getKey()).append(" = ").append(arg(entry.getValue())).append("\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Builds Python code with injected variable bindings.
+     * Each variable is assigned before the code using {@link #arg(Object)}
+     * for safe literal conversion.
+     */
+    static String buildWithVariables(Map<String, Object> variables, String code) {
+        if (variables.isEmpty()) {
+            return code;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> entry : variables.entrySet()) {
+            sb.append(entry.getKey()).append(" = ").append(arg(entry.getValue())).append("\n");
+        }
+        sb.append(code);
+        return sb.toString();
     }
 
     /**
@@ -844,6 +1023,11 @@ public class PythonEmbed implements AutoCloseable {
      * PythonEmbed.arg(Set.of(1, 2))    -&gt; {1, 2}
      * PythonEmbed.arg(Map.of("k", 1))  -&gt; {'k': 1}
      * PythonEmbed.arg(new byte[]{0, 255}) -&gt; b'\x00\xff'
+     *
+     * // Datetime types (requires import datetime):
+     * PythonEmbed.arg(LocalDateTime.now()) -&gt; datetime.datetime(2024, 1, 15, 10, 30, 0, 0)
+     * PythonEmbed.arg(LocalDate.of(2024, 1, 15)) -&gt; datetime.date(2024, 1, 15)
+     * PythonEmbed.arg(LocalTime.of(10, 30)) -&gt; datetime.time(10, 30, 0, 0)
      * }</pre>
      *
      * @param value the Java value to convert (null allowed)
@@ -907,6 +1091,46 @@ public class PythonEmbed implements AutoCloseable {
             }
             sb.append("'");
             return sb.toString();
+        }
+        if (value instanceof LocalDateTime dt) {
+            return String.format(
+                    "datetime.datetime(%d, %d, %d, %d, %d, %d, %d)",
+                    dt.getYear(), dt.getMonthValue(), dt.getDayOfMonth(),
+                    dt.getHour(), dt.getMinute(), dt.getSecond(),
+                    dt.getNano() / 1000);
+        }
+        if (value instanceof LocalDate d) {
+            return String.format(
+                    "datetime.date(%d, %d, %d)",
+                    d.getYear(), d.getMonthValue(), d.getDayOfMonth());
+        }
+        if (value instanceof LocalTime t) {
+            return String.format(
+                    "datetime.time(%d, %d, %d, %d)",
+                    t.getHour(), t.getMinute(), t.getSecond(),
+                    t.getNano() / 1000);
+        }
+        if (value instanceof ZonedDateTime zdt) {
+            int offsetSeconds = zdt.getOffset().getTotalSeconds();
+            return String.format(
+                    "datetime.datetime(%d, %d, %d, %d, %d, %d, %d, " +
+                    "tzinfo=datetime.timezone(datetime.timedelta(seconds=%d)))",
+                    zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth(),
+                    zdt.getHour(), zdt.getMinute(), zdt.getSecond(),
+                    zdt.getNano() / 1000, offsetSeconds);
+        }
+        if (value instanceof Instant inst) {
+            long epochSecond = inst.getEpochSecond();
+            int nano = inst.getNano();
+            if (nano == 0) {
+                return String.format(
+                        "datetime.datetime.fromtimestamp(%d, tz=datetime.timezone.utc)",
+                        epochSecond);
+            }
+            return String.format(
+                    "datetime.datetime.fromtimestamp(%d, tz=datetime.timezone.utc) + " +
+                    "datetime.timedelta(microseconds=%d)",
+                    epochSecond, nano / 1000);
         }
         if (value instanceof Set<?> set) {
             if (set.isEmpty()) {

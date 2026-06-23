@@ -1,7 +1,13 @@
 package io.github.howtis.pythonembed;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -187,6 +193,179 @@ public class PythonValue {
         throw new ClassCastException("Cannot convert " + className() + " to byte[]");
     }
 
+    /**
+     * Serializes the Python value to a JSON string using Java-side
+     * recursive serialization. This is a convenience method equivalent
+     * to {@code toJson(false)}.
+     *
+     * <p>The raw MessagePack-deserialized Java object is serialized
+     * directly, avoiding a Python round-trip.
+     *
+     * @return JSON representation of the Python value
+     * @throws PythonExecutionException if the value contains
+     *         non-JSON-serializable types or circular references
+     */
+    public String toJson() {
+        return toJson(false);
+    }
+
+    /**
+     * Serializes the Python value to a JSON string.
+     *
+     * <p>The raw MessagePack-deserialized Java object is serialized
+     * directly with optional pretty-printing.
+     *
+     * @param prettyPrint if {@code true}, the output is indented with 2 spaces
+     * @return JSON representation of the Python value
+     * @throws PythonExecutionException if the value contains
+     *         non-JSON-serializable types (e.g., bytes) or circular references
+     */
+    public String toJson(boolean prettyPrint) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            toJsonValue(raw, sb, prettyPrint, 0, new IdentityHashMap<>());
+        } catch (PythonExecutionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw PythonExecutionException.wrap("toJson", e);
+        }
+        if (prettyPrint) {
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    private static void toJsonValue(Object value, StringBuilder sb, boolean pretty,
+                                     int depth, IdentityHashMap<Object, Boolean> seen) {
+        if (value == null) {
+            sb.append("null");
+            return;
+        }
+        if (value instanceof Boolean) {
+            sb.append((Boolean) value ? "true" : "false");
+            return;
+        }
+        if (value instanceof Number n) {
+            if (n instanceof Double d) {
+                if (Double.isNaN(d) || Double.isInfinite(d)) {
+                    sb.append("null");
+                    return;
+                }
+            } else if (n instanceof Float f) {
+                if (Float.isNaN(f) || Float.isInfinite(f)) {
+                    sb.append("null");
+                    return;
+                }
+            }
+            sb.append(n);
+            return;
+        }
+        if (value instanceof String s) {
+            appendJsonString(sb, s);
+            return;
+        }
+        if (value instanceof byte[]) {
+            throw new PythonExecutionException(
+                    "Cannot serialize bytes to JSON. " +
+                    "Use asBytes() to extract the raw bytes.");
+        }
+        if (value instanceof List<?> list) {
+            if (!seen.containsKey(value)) {
+                seen.put(value, Boolean.TRUE);
+            } else {
+                throw new PythonExecutionException(
+                        "Cannot serialize circular reference to JSON");
+            }
+            sb.append('[');
+            boolean first = true;
+            for (Object item : list) {
+                if (!first) {
+                    sb.append(',');
+                    sb.append(' ');
+                }
+                first = false;
+                if (pretty) {
+                    sb.append('\n');
+                    indent(sb, depth + 1);
+                }
+                toJsonValue(item, sb, pretty, depth + 1, seen);
+            }
+            if (pretty && !list.isEmpty()) {
+                sb.append('\n');
+                indent(sb, depth);
+            }
+            sb.append(']');
+            return;
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (!seen.containsKey(value)) {
+                seen.put(value, Boolean.TRUE);
+            } else {
+                throw new PythonExecutionException(
+                        "Cannot serialize circular reference to JSON");
+            }
+            sb.append('{');
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!first) {
+                    sb.append(',');
+                    sb.append(' ');
+                }
+                first = false;
+                if (pretty) {
+                    sb.append('\n');
+                    indent(sb, depth + 1);
+                }
+                Object key = entry.getKey();
+                if (key instanceof String ks) {
+                    appendJsonString(sb, ks);
+                } else {
+                    appendJsonString(sb, String.valueOf(key));
+                }
+                sb.append(':');
+                sb.append(' ');
+                toJsonValue(entry.getValue(), sb, pretty, depth + 1, seen);
+            }
+            if (pretty && !map.isEmpty()) {
+                sb.append('\n');
+                indent(sb, depth);
+            }
+            sb.append('}');
+            return;
+        }
+        throw new PythonExecutionException(
+                "Cannot serialize " + value.getClass().getName() + " to JSON");
+    }
+
+    private static void appendJsonString(StringBuilder sb, String s) {
+        sb.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        sb.append('"');
+    }
+
+    private static void indent(StringBuilder sb, int depth) {
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
+        }
+    }
+
     @Override
     public String toString() {
         return "PythonValue{" + raw + "}";
@@ -242,6 +421,34 @@ public class PythonValue {
         }
         if (targetType == String.class) {
             return targetType.cast(value.toString());
+        }
+        if (targetType == LocalDateTime.class) {
+            if (value instanceof String s) {
+                return targetType.cast(LocalDateTime.parse(s));
+            }
+        }
+        if (targetType == LocalDate.class) {
+            if (value instanceof String s) {
+                return targetType.cast(LocalDate.parse(s));
+            }
+        }
+        if (targetType == LocalTime.class) {
+            if (value instanceof String s) {
+                return targetType.cast(LocalTime.parse(s));
+            }
+        }
+        if (targetType == ZonedDateTime.class) {
+            if (value instanceof String s) {
+                return targetType.cast(ZonedDateTime.parse(s));
+            }
+        }
+        if (targetType == Instant.class) {
+            if (value instanceof String s) {
+                return targetType.cast(Instant.parse(s));
+            }
+            if (value instanceof Number n) {
+                return targetType.cast(Instant.ofEpochMilli(n.longValue()));
+            }
         }
         throw new ClassCastException(
                 "Cannot convert " + value.getClass().getName() + " to " + targetType.getName());

@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -1300,6 +1303,93 @@ class PythonEmbedPoolTest {
         assertEquals("v", item.asString());
         PythonValue num = pool.eval("data[1]").get(3, TimeUnit.SECONDS);
         assertEquals(42.0, num.asDouble(), 0.001);
+    }
+
+    // ---- execFile ----
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void execFile_simpleScript() throws Exception {
+        Path scriptFile = Files.createTempFile("pyembed-pool-test", ".py");
+        try {
+            Files.writeString(scriptFile, "pi = 3.14");
+            pool.execFile(scriptFile).get(3, TimeUnit.SECONDS);
+            // Round-robin on all instances
+            for (int i = 0; i < pool.size(); i++) {
+                pool.execFile(scriptFile).get(3, TimeUnit.SECONDS);
+            }
+            PythonValue result = pool.eval("pi * 2").get(3, TimeUnit.SECONDS);
+            assertEquals(6.28, result.asDouble(), 0.01);
+        } finally {
+            Files.deleteIfExists(scriptFile);
+        }
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void execFile_withTimeoutOverride() throws Exception {
+        Path scriptFile = Files.createTempFile("pyembed-pool-test", ".py");
+        try {
+            Files.writeString(scriptFile, "answer = 42");
+            pool.execFile(scriptFile, 10_000).get(3, TimeUnit.SECONDS);
+            PythonValue result = pool.eval("answer").get(3, TimeUnit.SECONDS);
+            assertEquals(42, result.asInt());
+        } finally {
+            Files.deleteIfExists(scriptFile);
+        }
+    }
+
+    // ---- eval(Map) with variables ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void eval_withVariables_simpleMath() throws Exception {
+        PythonValue result = pool.eval(Map.of("x", 10, "y", 20), "x + y")
+                .get(3, TimeUnit.SECONDS);
+        assertEquals(30, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void eval_withVariables_emptyMap() throws Exception {
+        PythonValue result = pool.eval(Map.of(), "1 + 1")
+                .get(3, TimeUnit.SECONDS);
+        assertEquals(2, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void eval_withVariables_andTimeout() throws Exception {
+        PythonValue result = pool.eval(Map.of("a", 5), "a * a", 10_000)
+                .get(3, TimeUnit.SECONDS);
+        assertEquals(25, result.asInt());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void exec_withVariables_stateIsPreserved() throws Exception {
+        pool.exec(Map.of("greeting", "hi"), "result = greeting + ' there'")
+                .get(3, TimeUnit.SECONDS);
+        PythonValue result = pool.eval("result").get(3, TimeUnit.SECONDS);
+        assertEquals("hi there", result.asString());
+    }
+
+    // ---- toJson from pool eval ----
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void toJson_fromPoolEval() throws Exception {
+        PythonValue v = pool.eval("[1, 2, 3]").get(3, TimeUnit.SECONDS);
+        assertEquals("[1, 2, 3]", v.toJson());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void toJson_prettyPrint_fromPoolEval() throws Exception {
+        PythonValue v = pool.eval("{'key': 'value'}").get(3, TimeUnit.SECONDS);
+        String json = v.toJson(true);
+        assertTrue(json.contains("\n"));
+        assertTrue(json.contains("  "));
     }
 
     // ---- onInstanceRemoved hook ----

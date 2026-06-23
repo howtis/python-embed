@@ -2,6 +2,12 @@ package io.github.howtis.pythonembed;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -363,5 +369,91 @@ class PythonEmbedArgTest {
         map.put(1, "one");
         map.put(2, "two");
         assertEquals("{1: 'one', 2: 'two'}", PythonEmbed.arg(map));
+    }
+
+    // ------------------------------------------------------------------
+    // Datetime types
+    // ------------------------------------------------------------------
+
+    @Test
+    void localDateTime_basic() {
+        LocalDateTime dt = LocalDateTime.of(2024, 1, 15, 10, 30, 45, 123_000_000);
+        assertEquals("datetime.datetime(2024, 1, 15, 10, 30, 45, 123000)",
+                PythonEmbed.arg(dt));
+    }
+
+    @Test
+    void localDateTime_midnight() {
+        LocalDateTime dt = LocalDateTime.of(2024, 6, 1, 0, 0, 0, 0);
+        assertEquals("datetime.datetime(2024, 6, 1, 0, 0, 0, 0)",
+                PythonEmbed.arg(dt));
+    }
+
+    @Test
+    void localDateTime_endOfYear() {
+        LocalDateTime dt = LocalDateTime.of(2024, 12, 31, 23, 59, 59, 999_000_000);
+        assertEquals("datetime.datetime(2024, 12, 31, 23, 59, 59, 999000)",
+                PythonEmbed.arg(dt));
+    }
+
+    @Test
+    void localDate_basic() {
+        LocalDate d = LocalDate.of(2024, 1, 15);
+        assertEquals("datetime.date(2024, 1, 15)", PythonEmbed.arg(d));
+    }
+
+    @Test
+    void localDate_leapYear() {
+        LocalDate d = LocalDate.of(2024, 2, 29);
+        assertEquals("datetime.date(2024, 2, 29)", PythonEmbed.arg(d));
+    }
+
+    @Test
+    void localTime_basic() {
+        LocalTime t = LocalTime.of(10, 30, 45, 123_000_000);
+        assertEquals("datetime.time(10, 30, 45, 123000)", PythonEmbed.arg(t));
+    }
+
+    @Test
+    void localTime_midnight() {
+        LocalTime t = LocalTime.of(0, 0, 0, 0);
+        assertEquals("datetime.time(0, 0, 0, 0)", PythonEmbed.arg(t));
+    }
+
+    @Test
+    void zonedDateTime_utc() {
+        ZonedDateTime zdt = ZonedDateTime.of(
+                2024, 1, 15, 10, 30, 0, 0, ZoneOffset.UTC);
+        assertEquals(
+                "datetime.datetime(2024, 1, 15, 10, 30, 0, 0, " +
+                "tzinfo=datetime.timezone(datetime.timedelta(seconds=0)))",
+                PythonEmbed.arg(zdt));
+    }
+
+    @Test
+    void zonedDateTime_plus9() {
+        ZonedDateTime zdt = ZonedDateTime.of(
+                2024, 1, 15, 10, 30, 0, 0, ZoneOffset.ofHours(9));
+        assertEquals(
+                "datetime.datetime(2024, 1, 15, 10, 30, 0, 0, " +
+                "tzinfo=datetime.timezone(datetime.timedelta(seconds=32400)))",
+                PythonEmbed.arg(zdt));
+    }
+
+    @Test
+    void instant_noNanos() {
+        Instant inst = Instant.ofEpochSecond(1705312200L);
+        assertEquals(
+                "datetime.datetime.fromtimestamp(1705312200, tz=datetime.timezone.utc)",
+                PythonEmbed.arg(inst));
+    }
+
+    @Test
+    void instant_withNanos() {
+        Instant inst = Instant.ofEpochSecond(1705312200L, 123_000_000L);
+        assertEquals(
+                "datetime.datetime.fromtimestamp(1705312200, tz=datetime.timezone.utc) + " +
+                "datetime.timedelta(microseconds=123000)",
+                PythonEmbed.arg(inst));
     }
 }
