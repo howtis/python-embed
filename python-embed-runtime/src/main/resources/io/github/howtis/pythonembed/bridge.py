@@ -20,6 +20,16 @@ Additional command types:
               or {"id":<int>,"type":"error","message":"..."}
 
 The process stays alive until it receives an EOF on stdin or an exit command.
+
+**SECURITY WARNING — Namespace Sandbox**: This bridge does **not** restrict
+``__builtins__`` in the eval/exec namespace. Python code sent via eval/exec has
+full access to ``__import__()``, ``open()``, ``os``, ``shutil``, and all other
+built-in functions. This means **arbitrary code execution is possible**,
+including file system access, network access, and subprocess spawning.
+
+Only pass trusted code to eval/exec. If user-controlled input reaches
+eval/exec, it must be sanitized — for example via ``PythonEmbed.arg()`` on the
+Java side for parameter substitution into literal strings.
 """
 
 import sys
@@ -221,8 +231,11 @@ def run_binary_loop():
     """MessagePack binary protocol loop."""
     global namespace
 
-    namespace = {}
-    namespace['_bridge'] = _Bridge()
+    # WARNING: The namespace does not restrict __builtins__. eval/exec can
+    # access __import__(), open(), and all built-in functions.
+    # Only pass trusted code. For parameter substitution, use PythonEmbed.arg()
+    # on the Java side to escape values safely.
+    namespace = {'_bridge': _Bridge()}
 
     # Install logging handler to forward Python logs to Java via protocol frames
     _log_handler = _ProtocolLogHandler()
