@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-06-23
+
+### Changed
+- Add default_encoder fallback to msgpack.packb in write_frame for broader type compatibility
+- Include MIT LICENSE file in all JAR artifacts
+
 ## [1.0.0] - 2026-06-23
 
 ### Added
@@ -22,4 +28,5 @@
 - Close hook support for resource cleanup
 - 13 example applications in `python-embed-examples`
 
+[1.0.1]: https://github.com/howtis/python-embed/releases/tag/v1.0.1
 [1.0.0]: https://github.com/howtis/python-embed/releases/tag/v1.0.0

@@ -13,7 +13,7 @@ Add the Gradle plugin to `build.gradle`:
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.0'
+    id 'io.github.howtis.python-embed' version '1.0.1'
 }
 
 pythonEmbed {
@@ -61,11 +61,11 @@ That's it. The Gradle plugin handles Python installation, venv creation, and pac
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.0'
+    id 'io.github.howtis.python-embed' version '1.0.1'
 }
 
 dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.0'
+    implementation 'io.github.howtis:python-embed-runtime:1.0.1'
 }
 ```
 
@@ -296,7 +296,7 @@ Add `python-embed-spring-boot-starter` for zero-code Spring Boot 3.x integration
 
 ```groovy
 dependencies {
-    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.0'
+    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.1'
 }
 ```
 
