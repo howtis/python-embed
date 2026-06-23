@@ -1,0 +1,12 @@
+plugins {
+    id 'io.github.howtis.python-embed'
+}
+
+dependencies {
+    implementation project(':python-embed-runtime')
+    implementation 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+pythonEmbed {
+    packages = ['pandas', 'msgpack']
+}

@@ -1,0 +1,18 @@
+rootProject.name = 'python-embed-examples'
+
+includeBuild '../python-embed-gradle-plugin'
+include ':python-embed-runtime'
+project(':python-embed-runtime').projectDir = file('../python-embed-runtime')
+
+include 'basic-eval'
+include 'numpy-basic'
+include 'pool-async'
+include 'callback-bridge'
+include 'proxy-object'
+include 'streaming'
+include 'error-handling'
+include 'configuration'
+include 'object-handle'
+include 'health-monitor'
+include 'batch-operations'
+include 'pandas-dataframe'
