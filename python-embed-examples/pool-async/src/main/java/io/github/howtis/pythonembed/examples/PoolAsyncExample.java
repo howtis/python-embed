@@ -46,9 +46,9 @@ public class PoolAsyncExample {
 
             // ---- Batch execution ----
             CompletableFuture<List<PythonValue>> batch = pool.batchEval(
-                    List.of("i * 2", "i + 1", "i ** 2"));
+                    List.of("5 * 2", "5 + 1", "5 ** 2"));
             List<PythonValue> results = batch.get(5, TimeUnit.SECONDS);
-            System.out.println("batchEval [i*2, i+1, i**2] with i=5:");
+            System.out.println("batchEval [5*2, 5+1, 5**2]:");
             for (int i = 0; i < results.size(); i++) {
                 System.out.println("  " + i + ": " + results.get(i).asInt());
             }

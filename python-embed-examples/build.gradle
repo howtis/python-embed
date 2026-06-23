@@ -1,5 +1,6 @@
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'application'
 
     group = 'io.github.howtis'
     version = '1.0.0-SNAPSHOT'

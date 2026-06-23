@@ -52,18 +52,24 @@ public class ProxyObjectExample {
             System.out.println(tools.greet("World"));
             System.out.println(tools.shout("hello"));
 
-            // ---- Proxy with built-in types ----
-            py.exec("data = {'name': 'Alice', 'age': 30, 'city': 'Seoul'}");
+            // ---- Proxy with snake_case conversion demo ----
+            py.exec("""
+                    class DataStore:
+                        def get_user_name(self):
+                            return "Alice"
+                        def get_user_age(self):
+                            return 30
+                    store = DataStore()
+                    """);
 
-            // You can proxy Python dicts too
-            interface PersonInfo {
-                String get(String key);
-                Object getItem(String key);
+            interface DataStore {
+                String getUserName();
+                int getUserAge();
             }
 
-            PersonInfo info = py.proxy("data", PersonInfo.class);
-            System.out.println("name = " + info.get("name"));
-            System.out.println("age  = " + info.getItem("age"));
+            DataStore store = py.proxy("store", DataStore.class);
+            System.out.println("userName = " + store.getUserName());
+            System.out.println("userAge  = " + store.getUserAge());
 
             System.out.println("\nAll proxy operations completed.");
         }

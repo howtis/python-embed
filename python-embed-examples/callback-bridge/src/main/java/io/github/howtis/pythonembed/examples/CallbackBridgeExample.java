@@ -25,15 +25,11 @@ public class CallbackBridgeExample {
             });
 
             // Python calls back into Java
-            py.exec("""
-                    result1 = _bridge.call("greet", "Python")
-                    print("Python got:", result1)
-                    """);
+            String greetResult = py.eval("_bridge.call('greet', 'Python')").asString();
+            System.out.println("Python got (via _bridge.call): " + greetResult);
 
-            py.exec("""
-                    result2 = _bridge.call("add", 10, 20)
-                    print("Python got:", result2)
-                    """);
+            int addResult = py.eval("_bridge.call('add', 10, 20)").asInt();
+            System.out.println("Python got (via _bridge.call): " + addResult);
 
             // ---- registerPushHandler: fire-and-forget ----
             py.registerPushHandler("progress", (String name, Object value) -> {
@@ -49,10 +45,8 @@ public class CallbackBridgeExample {
             py.registerCallback("format", String.class, Integer.class, String.class,
                     (name, age, city) -> String.format("%s is %d years old from %s", name, age, city));
 
-            py.exec("""
-                    info = _bridge.call("format", "Alice", 30, "Seoul")
-                    print("Formatted:", info)
-                    """);
+            String formatted = py.eval("_bridge.call('format', 'Alice', 30, 'Seoul')").asString();
+            System.out.println("Formatted: " + formatted);
 
             System.out.println("\nAll callback operations completed.");
         }
