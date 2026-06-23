@@ -1,16 +1,25 @@
 plugins {
     id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '1.3.1'
 }
+
+group = 'io.github.howtis'
+version = '1.0.0'
 
 repositories {
     mavenCentral()
 }
 
 gradlePlugin {
+    website = 'https://github.com/howtis/python-embed'
+    vcsUrl = 'https://github.com/howtis/python-embed.git'
     plugins {
         pythonEmbed {
             id = 'io.github.howtis.python-embed'
             implementationClass = 'io.github.howtis.pythonembed.gradle.PythonEmbedPlugin'
+            displayName = 'Python Embed Gradle Plugin'
+            description = 'Embeds Python environment into Java applications'
+            tags.set(['python', 'embed', 'msgpack'])
         }
     }
 }

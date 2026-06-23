@@ -1,21 +1,66 @@
 plugins {
     id 'java'
+    id 'com.vanniktech.maven.publish' version '0.34.0'
 }
 
 group = 'io.github.howtis'
 version = '1.0.0-SNAPSHOT'
 
+repositories {
+    mavenCentral()
+}
+
 subprojects {
+    group = rootProject.group
+    version = rootProject.version
+
     apply plugin: 'java'
+    apply plugin: 'com.vanniktech.maven.publish'
 
     repositories {
         mavenCentral()
     }
 
     java {
+        withSourcesJar()
+        withJavadocJar()
         toolchain {
             languageVersion = JavaLanguageVersion.of(17)
         }
+    }
+
+    mavenPublishing {
+        publishToMavenCentral(true)
+        signAllPublications()
+        //noinspection GroovyAssignabilityCheck
+        pom {
+            name = 'python-embed'
+            description = 'Embed Python in Java applications'
+            url = 'https://github.com/howtis/python-embed'
+            licenses {
+                license {
+                    name = 'MIT License'
+                    url = 'https://opensource.org/licenses/MIT'
+                }
+            }
+            developers {
+                developer {
+                    id = 'howtis'
+                    name = 'howtis'
+                    url = 'https://github.com/howtis'
+                }
+            }
+            scm {
+                url = 'https://github.com/howtis/python-embed'
+                connection = 'scm:git:git://github.com/howtis/python-embed.git'
+                developerConnection = 'scm:git:ssh://github.com/howtis/python-embed.git'
+            }
+        }
+    }
+
+    tasks.named('sourcesJar') {
+        dependsOn(tasks.named('generatePythonEmbedProperties'))
+        dependsOn(tasks.named('createVenv'))
     }
 
     tasks.withType(Test).configureEach {
