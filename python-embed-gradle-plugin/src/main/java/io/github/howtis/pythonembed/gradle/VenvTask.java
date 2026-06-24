@@ -653,9 +653,10 @@ public abstract class VenvTask extends DefaultTask {
                 int typeFlag = header[156] & 0xFF;
 
                 // ZipSlip protection: normalize and validate path is within targetDir
-                // Strip leading separator to prevent absolute path traversal
-                String safeName = name;
-                while (safeName.startsWith("/") || safeName.startsWith("\\")) {
+                // Strip leading separator and convert backslashes to forward slashes
+                // for cross-platform compatibility (tar always uses '/' as separator)
+                String safeName = name.replace('\\', '/');
+                while (safeName.startsWith("/")) {
                     safeName = safeName.substring(1);
                 }
                 Path entryTarget = targetDir.resolve(safeName).normalize();

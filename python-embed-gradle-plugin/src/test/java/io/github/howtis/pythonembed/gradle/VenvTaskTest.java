@@ -146,10 +146,8 @@ class VenvTaskTest {
         File venvDir = venvPath.toFile();
         task.getVenvDir().set(project.getLayout().getProjectDirectory().dir(tempDir.toString() + "/test-venv"));
 
-        // Create fake python executable (Scripts/python.exe for Windows venv layout)
-        Path scriptsDir = venvPath.resolve("Scripts");
-        Files.createDirectories(scriptsDir);
-        Files.createFile(scriptsDir.resolve("python.exe"));
+        // Create fake python executable in OS-appropriate location
+        createPrimaryPythonExe(venvPath);
 
         // Set packages and compute expected fingerprint
         // msgpack is auto-added by VenvTask, so include it in the expected hash
@@ -193,10 +191,8 @@ class VenvTaskTest {
         Path venvPath = tempDir.resolve("test-venv");
         task.getVenvDir().set(project.getLayout().getProjectDirectory().dir(tempDir.toString() + "/test-venv"));
 
-        // Create fake python executable
-        Path scriptsDir = venvPath.resolve("Scripts");
-        Files.createDirectories(scriptsDir);
-        Files.createFile(scriptsDir.resolve("python.exe"));
+        // Create fake python executable in OS-appropriate location
+        createPrimaryPythonExe(venvPath);
 
         // Set packages that don't match the stored fingerprint
         task.getPackages().set(List.of("numpy==1.26.4"));
@@ -303,34 +299,26 @@ class VenvTaskTest {
 
     @Test
     void findPythonInDir_pythonExeAtRoot_returnsPath(@TempDir Path tempDir) throws Exception {
-        Path pythonExe = tempDir.resolve("python.exe");
-        Files.createFile(pythonExe);
+        Path pythonExe = createPrimaryPythonExe(tempDir);
 
         Path result = task.findPythonInDir(tempDir);
         assertEquals(pythonExe, result);
     }
 
     @Test
-    void findPythonInDir_pythonExeInScripts_returnsScriptsPath(@TempDir Path tempDir) throws Exception {
-        // When root has no python.exe, should find Scripts/python.exe
-        Path scriptsDir = tempDir.resolve("Scripts");
-        Files.createDirectories(scriptsDir);
-        Path pythonExe = scriptsDir.resolve("python.exe");
-        Files.createFile(pythonExe);
+    void findPythonInDir_pythonExeInSubdir_returnsSubdirPath(@TempDir Path tempDir) throws Exception {
+        // When root has no python executable, should find secondary location
+        Path pythonExe = createSecondaryPythonExe(tempDir);
 
         Path result = task.findPythonInDir(tempDir);
         assertEquals(pythonExe, result);
     }
 
     @Test
-    void findPythonInDir_rootPreferredOverScripts(@TempDir Path tempDir) throws Exception {
-        // When both root and Scripts have python.exe, root takes precedence
-        Path rootExe = tempDir.resolve("python.exe");
-        Files.createFile(rootExe);
-        Path scriptsDir = tempDir.resolve("Scripts");
-        Files.createDirectories(scriptsDir);
-        Path scriptsExe = scriptsDir.resolve("python.exe");
-        Files.createFile(scriptsExe);
+    void findPythonInDir_rootPreferredOverSubdir(@TempDir Path tempDir) throws Exception {
+        // When both primary and secondary locations have python executable, primary takes precedence
+        Path rootExe = createPrimaryPythonExe(tempDir);
+        createSecondaryPythonExe(tempDir);
 
         Path result = task.findPythonInDir(tempDir);
         assertEquals(rootExe, result);
@@ -343,12 +331,46 @@ class VenvTaskTest {
     }
 
     @Test
-    void findPythonInDir_emptyScriptsDir_returnsNull(@TempDir Path tempDir) throws Exception {
-        // Scripts directory exists but has no python.exe, and no python.exe at root
-        Files.createDirectories(tempDir.resolve("Scripts"));
+    void findPythonInDir_emptySubdir_returnsNull(@TempDir Path tempDir) throws Exception {
+        // Subdirectory exists but has no python executable, and none at root
+        Path subDir = tempDir.resolve(isWindows() ? "Scripts" : "bin");
+        Files.createDirectories(subDir);
 
         Path result = task.findPythonInDir(tempDir);
         assertNull(result);
+    }
+
+    // ---- helpers ----
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    /** Creates the primary (preferred) Python executable for the current OS. */
+    private Path createPrimaryPythonExe(Path baseDir) throws IOException {
+        Path exe;
+        if (isWindows()) {
+            Files.createDirectories(baseDir);
+            exe = baseDir.resolve("python.exe");
+        } else {
+            exe = baseDir.resolve("bin").resolve("python3");
+        }
+        Files.createDirectories(exe.getParent());
+        Files.createFile(exe);
+        return exe;
+    }
+
+    /** Creates the secondary Python executable for the current OS. */
+    private Path createSecondaryPythonExe(Path baseDir) throws IOException {
+        Path exe;
+        if (isWindows()) {
+            exe = baseDir.resolve("Scripts").resolve("python.exe");
+        } else {
+            exe = baseDir.resolve("bin").resolve("python");
+        }
+        Files.createDirectories(exe.getParent());
+        Files.createFile(exe);
+        return exe;
     }
 
     // ---- tar.gz creation helpers ----
