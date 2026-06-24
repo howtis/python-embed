@@ -19,16 +19,32 @@ import org.gradle.api.provider.Property;
  */
 public abstract class PythonEmbedExtension {
 
-    /** Python version to use (default: "3.12"). */
+    /**
+     * Python version to use (default: "3.12").
+     *
+     * @return Python version property
+     */
     public abstract Property<String> getPythonVersion();
 
-    /** List of pip packages to install (default: empty). */
+    /**
+     * List of pip packages to install (default: empty).
+     *
+     * @return list of pip packages
+     */
     public abstract ListProperty<String> getPackages();
 
-    /** Optional pip index URL (e.g., PyTorch CUDA index). */
+    /**
+     * Optional pip index URL (e.g., PyTorch CUDA index).
+     *
+     * @return optional pip index URL
+     */
     public abstract Property<String> getPipIndexUrl();
 
-    /** Optional extra pip install arguments (e.g., --extra-index-url, -f). */
+    /**
+     * Optional extra pip install arguments (e.g., --extra-index-url, -f).
+     *
+     * @return optional extra pip install arguments
+     */
     public abstract ListProperty<String> getPipExtraArgs();
 
     /**
@@ -38,13 +54,23 @@ public abstract class PythonEmbedExtension {
      * in the JAR as a classpath resource. If set to a path outside the build
      * directory, the venv is kept external and referenced via a generated
      * properties file at runtime.
+     *
+     * @return output directory for the Python virtual environment
      */
     public abstract DirectoryProperty getVenvOutputDir();
 
-    /** Optional path to requirements.txt (relative to project root). */
+    /**
+     * Optional path to requirements.txt (relative to project root).
+     *
+     * @return optional path to requirements.txt
+     */
     public abstract Property<String> getRequirementsFile();
 
-    /** Optional path to pyproject.toml (relative to project root). */
+    /**
+     * Optional path to pyproject.toml (relative to project root).
+     *
+     * @return optional path to pyproject.toml
+     */
     public abstract Property<String> getPyprojectTomlFile();
 
     /**
@@ -55,9 +81,12 @@ public abstract class PythonEmbedExtension {
      *
      * <p>Valid values: {@code "windows"}, {@code "linux"}, {@code "macos"}
      * (case-insensitive). When not set, the build OS is auto-detected.
+     *
+     * @return target OS for cross-compilation
      */
     public abstract Property<String> getTargetOs();
 
+    /** Creates a new extension with default values. */
     public PythonEmbedExtension() {
         getPythonVersion().convention("3.12");
         getPackages().convention(java.util.List.of());

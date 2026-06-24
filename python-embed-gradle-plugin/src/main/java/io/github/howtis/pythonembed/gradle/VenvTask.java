@@ -59,42 +59,75 @@ public abstract class VenvTask extends DefaultTask {
         String packageHash;
     }
 
-    /** Path to the output directory that will be packaged as a resource. */
+    /**
+     * Path to the output directory that will be packaged as a resource.
+     *
+     * @return the venv directory
+     */
     @OutputDirectory
     public abstract DirectoryProperty getVenvDir();
 
-    /** List of pip packages to install. */
+    /**
+     * List of pip packages to install.
+     *
+     * @return list of pip packages
+     */
     @Input
     public abstract ListProperty<String> getPackages();
 
-    /** Optional path to requirements.txt (relative to project root). */
+    /**
+     * Optional path to requirements.txt (relative to project root).
+     *
+     * @return optional path to requirements.txt
+     */
     @Optional
     @Input
     public abstract Property<String> getRequirementsFile();
 
-    /** Optional path to pyproject.toml (relative to project root). */
+    /**
+     * Optional path to pyproject.toml (relative to project root).
+     *
+     * @return optional path to pyproject.toml
+     */
     @Optional
     @Input
     public abstract Property<String> getPyprojectTomlFile();
 
-    /** Python version to use for auto-download (default: "3.12"). */
+    /**
+     * Python version to use for auto-download (default: "3.12").
+     *
+     * @return Python version property
+     */
     @Input
     public abstract Property<String> getPythonVersion();
 
-    /** Optional pip index URL (e.g., PyTorch CUDA index). */
+    /**
+     * Optional pip index URL (e.g., PyTorch CUDA index).
+     *
+     * @return optional pip index URL
+     */
     @Optional
     @Input
     public abstract Property<String> getPipIndexUrl();
 
-    /** Optional extra pip install arguments (e.g., --extra-index-url, -f). */
+    /**
+     * Optional extra pip install arguments (e.g., --extra-index-url, -f).
+     *
+     * @return optional extra pip install arguments
+     */
     @Input
     public abstract ListProperty<String> getPipExtraArgs();
 
-    /** Target OS for cross-compilation: "windows", "linux", "macos" (null = auto-detect). */
+    /**
+     * Target OS for cross-compilation: "windows", "linux", "macos" (null = auto-detect).
+     *
+     * @return target OS property
+     */
     @Optional
     @Input
     public abstract Property<String> getTargetOs();
 
+    /** Creates or updates the Python virtual environment. */
     @TaskAction
     public void createVenv() {
         List<String> packages = new ArrayList<>(getPackages().get());

@@ -125,14 +125,23 @@ public class PythonEmbedPlugin implements Plugin<Project> {
      */
     public static abstract class GeneratePropsTask extends DefaultTask {
 
-        /** The venv directory (input). */
+        /**
+         * The venv directory (input).
+         *
+         * @return the venv directory
+         */
         @org.gradle.api.tasks.InputDirectory
         public abstract DirectoryProperty getVenvDir();
 
-        /** Output directory for the properties file (under resources). */
+        /**
+         * Output directory for the properties file (under resources).
+         *
+         * @return output directory for the properties file
+         */
         @OutputDirectory
         public abstract DirectoryProperty getOutputDir();
 
+        /** Generates the properties file. */
         @TaskAction
         public void generate() {
             Path venvPath = getVenvDir().get().getAsFile().toPath().toAbsolutePath();
