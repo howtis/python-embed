@@ -4,25 +4,24 @@ AI coding agent instructions for the **python-embed** project.
 
 ## Obsidian Memory
 
-This project uses an Obsidian vault (`agent-memory`) for cross-session memory.
+This project uses an Obsidian vault (`python-embed`) for cross-session memory.
 On session start, read the project context and preferences:
 
 ```bash
-obsidian vault="agent-memory" read path="Projects/preferences.md"
-obsidian vault="agent-memory" read path="Projects/python-embed.md"
+obsidian vault="python-embed" read path="preferences.md"
 ```
 
 ### During Session
 
 - All documentation must be managed within Obsidian. Do not leave any documentation within the project.
 
-- **Decision made** → read `Projects/vault-naming-convention.md` → create `Decisions/{title}.md`
-- **Task completed/created** → update `Tasks/active.md`, `Tasks/completed.md`
+- **Decision made** → create `Decisions/{title}.md`
+- **Task completed/created** → update `Tasks/active.md`
 
 ### Session End
 
 - Update `Tasks/active.md`, `Tasks/completed.md` and `Decisions/{title}.md`
-- Rebuild `_Index.md` if many notes were added
+- Rebuild `_Index.md`
 
 ## Git
 
