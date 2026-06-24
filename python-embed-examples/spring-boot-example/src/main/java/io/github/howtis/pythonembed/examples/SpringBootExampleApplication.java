@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -20,7 +21,8 @@ public class SpringBootExampleApplication {
     private static final Logger log = LoggerFactory.getLogger(SpringBootExampleApplication.class);
 
     public static void main(String[] args) {
-        SpringApplication.run(SpringBootExampleApplication.class, args);
+        ConfigurableApplicationContext ctx = SpringApplication.run(SpringBootExampleApplication.class, args);
+        SpringApplication.exit(ctx, () -> 0);
     }
 
     @Bean

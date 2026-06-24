@@ -41,18 +41,19 @@ tasks.register('runAllExamples') {
 
             def name = subproject.name
             def timeoutMs = heavyExamples.contains(name) ? heavyTimeoutMs : defaultTimeoutMs
-            def timeoutDuration = java.time.Duration.ofMillis(timeoutMs)
 
             logger.lifecycle("Running {} (timeout={}s)...", name, timeoutMs / 1000)
 
             def start = System.currentTimeMillis()
             def result
+            def theMainClass = mainClass
+            def theClasspath = subproject.sourceSets.main.runtimeClasspath
             try {
-                javaexec {
-                    classpath = subproject.sourceSets.main.runtimeClasspath
-                    mainClass = mainClass
-                    timeout = timeoutDuration
-                    maxHeapSize = '512m'
+                project.javaexec {
+                    it.workingDir = subproject.projectDir
+                    it.classpath = theClasspath
+                    it.mainClass.set(theMainClass)
+                    it.maxHeapSize = '512m'
                 }
                 def elapsed = System.currentTimeMillis() - start
                 logger.lifecycle("  PASS {} ({}ms)", name, elapsed)
