@@ -165,6 +165,70 @@ class PythonProcessManagerTest {
     }
 
     // ------------------------------------------------------------------
+    // findVenvSitePackages()
+    // ------------------------------------------------------------------
+
+    @Test
+    void findVenvSitePackages_unixVenvLayout() throws Exception {
+        tempDir = Files.createTempDirectory("test-venv-sp-");
+        Path sitePkgs = Files.createDirectories(
+                tempDir.resolve("lib").resolve("python3.12").resolve("site-packages"));
+
+        // On Windows the method looks for Lib/site-packages
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (isWindows) {
+            // Windows: set up Lib/site-packages
+            Path winSitePkgs = Files.createDirectories(
+                    tempDir.resolve("Lib").resolve("site-packages"));
+            Path found = PythonProcessManager.findVenvSitePackages(tempDir);
+            assertEquals(winSitePkgs, found);
+        } else {
+            Path found = PythonProcessManager.findVenvSitePackages(tempDir);
+            assertEquals(sitePkgs, found);
+        }
+    }
+
+    @Test
+    void findVenvSitePackages_picksFirstMatchingPython() throws Exception {
+        tempDir = Files.createTempDirectory("test-venv-sp-multi-");
+        Path first = Files.createDirectories(
+                tempDir.resolve("lib").resolve("python3.12").resolve("site-packages"));
+        Path second = Files.createDirectories(
+                tempDir.resolve("lib").resolve("python3.11").resolve("site-packages"));
+
+        Path found = PythonProcessManager.findVenvSitePackages(tempDir);
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (!isWindows) {
+            assertNotNull(found);
+            // Either is acceptable (order depends on Files.list)
+            assertTrue(found.equals(first) || found.equals(second),
+                    "Expected one of the python site-packages dirs, got: " + found);
+        }
+        // On Windows the unix lib dir won't match, returns null; that's fine
+    }
+
+    @Test
+    void findVenvSitePackages_noLibDir_returnsNull() {
+        tempDir = new java.io.File("nonexistent-" + System.nanoTime()).toPath();
+        Path found = PythonProcessManager.findVenvSitePackages(tempDir);
+        assertNull(found);
+    }
+
+    @Test
+    void findVenvSitePackages_noSitePackages_returnsNull() throws Exception {
+        tempDir = Files.createTempDirectory("test-venv-sp-nosp-");
+        Files.createDirectories(tempDir.resolve("lib").resolve("python3.12"));
+        // No site-packages subdirectory
+
+        Path found = PythonProcessManager.findVenvSitePackages(tempDir);
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (!isWindows) {
+            assertNull(found);
+        }
+        // On Windows the unix lib dir won't match, returns null; that's fine
+    }
+
+    // ------------------------------------------------------------------
     // isRunning()
     // ------------------------------------------------------------------
 

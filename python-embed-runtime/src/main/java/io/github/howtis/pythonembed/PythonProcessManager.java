@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
@@ -14,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * Manages a persistent CPython REPL process that communicates via stdin/stdout
@@ -76,9 +78,21 @@ class PythonProcessManager {
                 + " --max-code-length " + maxCodeLength);
         pb.redirectErrorStream(false);
 
-        // Apply environment variables
+        // Add venv site-packages to PYTHONPATH so msgpack is importable
+        Map<String, String> pbEnv = pb.environment();
+        if (venvPath != null) {
+            Path sitePackages = findVenvSitePackages(venvPath);
+            if (sitePackages != null) {
+                String existing = pbEnv.getOrDefault("PYTHONPATH", "");
+                String newPath = sitePackages.toAbsolutePath().toString();
+                String pythonPath = existing.isEmpty() ? newPath : newPath + java.io.File.pathSeparator + existing;
+                pbEnv.put("PYTHONPATH", pythonPath);
+                logger.info(() -> "Python process PYTHONPATH: " + pythonPath);
+            }
+        }
+
+        // Apply environment variables (may override PYTHONPATH)
         if (env != null && !env.isEmpty()) {
-            Map<String, String> pbEnv = pb.environment();
             pbEnv.putAll(env);
             logger.info(() -> "Python process env vars: " + env.keySet());
         }
@@ -298,6 +312,43 @@ class PythonProcessManager {
         }
     }
 
+
+    /**
+     * Finds the site-packages directory inside a venv.
+     *
+     * <p>On Unix: {@code lib/python3.X/site-packages}
+     * On Windows: {@code Lib/site-packages}
+     *
+     * @param venvPath root directory of the venv
+     * @return path to site-packages, or null if not found
+     */
+    static Path findVenvSitePackages(Path venvPath) {
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (isWindows) {
+            Path sitePkgs = venvPath.resolve("Lib").resolve("site-packages");
+            if (Files.isDirectory(sitePkgs)) {
+                return sitePkgs;
+            }
+            return null;
+        } else {
+            Path libDir = venvPath.resolve("lib");
+            if (!Files.isDirectory(libDir)) {
+                return null;
+            }
+            try (Stream<Path> entries = Files.list(libDir)) {
+                return entries
+                        .filter(Files::isDirectory)
+                        .filter(p -> p.getFileName().toString().startsWith("python"))
+                        .map(p -> p.resolve("site-packages"))
+                        .filter(Files::isDirectory)
+                        .findFirst()
+                        .orElse(null);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "Failed to scan venv lib directory", e);
+                return null;
+            }
+        }
+    }
 
     /**
      * Resolves the Python executable within a directory.
