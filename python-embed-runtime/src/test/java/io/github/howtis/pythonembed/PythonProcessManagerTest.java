@@ -85,8 +85,15 @@ class PythonProcessManagerTest {
     @Test
     void resolvePythonExecutable_venvLayout() throws Exception {
         tempDir = Files.createTempDirectory("test-venv-");
-        Path scriptsDir = Files.createDirectories(tempDir.resolve("Scripts"));
-        Path pythonExe = scriptsDir.resolve("python.exe");
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        Path pythonExe;
+        if (isWindows) {
+            Path scriptsDir = Files.createDirectories(tempDir.resolve("Scripts"));
+            pythonExe = scriptsDir.resolve("python.exe");
+        } else {
+            Path binDir = Files.createDirectories(tempDir.resolve("bin"));
+            pythonExe = binDir.resolve("python3");
+        }
         Files.createFile(pythonExe);
 
         String resolved = PythonProcessManager.resolvePythonExecutable(tempDir);
@@ -96,7 +103,14 @@ class PythonProcessManagerTest {
     @Test
     void resolvePythonExecutable_standaloneLayout() throws Exception {
         tempDir = Files.createTempDirectory("test-standalone-");
-        Path pythonExe = tempDir.resolve("python.exe");
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        Path pythonExe;
+        if (isWindows) {
+            pythonExe = tempDir.resolve("python.exe");
+        } else {
+            Path binDir = Files.createDirectories(tempDir.resolve("bin"));
+            pythonExe = binDir.resolve("python3");
+        }
         Files.createFile(pythonExe);
 
         String resolved = PythonProcessManager.resolvePythonExecutable(tempDir);
@@ -106,24 +120,41 @@ class PythonProcessManagerTest {
     @Test
     void resolvePythonExecutable_venvLayoutPreferredOverStandalone() throws Exception {
         tempDir = Files.createTempDirectory("test-both-");
-        Path scriptsDir = Files.createDirectories(tempDir.resolve("Scripts"));
-        Path venvPy = scriptsDir.resolve("python.exe");
-        Files.createFile(venvPy);
-        Path standalonePy = tempDir.resolve("python.exe");
-        Files.createFile(standalonePy);
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        Path preferredPy;
+        if (isWindows) {
+            Path scriptsDir = Files.createDirectories(tempDir.resolve("Scripts"));
+            preferredPy = scriptsDir.resolve("python.exe");
+            Files.createFile(preferredPy);
+            Path standalonePy = tempDir.resolve("python.exe");
+            Files.createFile(standalonePy);
+        } else {
+            Path binDir = Files.createDirectories(tempDir.resolve("bin"));
+            preferredPy = binDir.resolve("python3");
+            Files.createFile(preferredPy);
+            Path fallbackPy = binDir.resolve("python");
+            Files.createFile(fallbackPy);
+        }
 
         String resolved = PythonProcessManager.resolvePythonExecutable(tempDir);
-        assertEquals(venvPy.toAbsolutePath().toString(), resolved,
-                "venv layout (Scripts/python.exe) should be preferred over standalone (root python.exe)");
+        assertEquals(preferredPy.toAbsolutePath().toString(), resolved,
+                "venv layout should be preferred over standalone");
     }
 
     @Test
     void resolvePythonExecutable_fallbackWhenNeitherExists() {
         tempDir = Path.of("nonexistent-" + System.nanoTime());
         String resolved = PythonProcessManager.resolvePythonExecutable(tempDir);
-        assertTrue(resolved.endsWith("Scripts/py" + "thon.exe")
-                || resolved.endsWith("Scripts\\py" + "thon.exe"),
-                "should fall back to Scripts/python.exe path: " + resolved);
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (isWindows) {
+            assertTrue(resolved.endsWith("Scripts/py" + "thon.exe")
+                    || resolved.endsWith("Scripts\\py" + "thon.exe"),
+                    "should fall back to Scripts/python.exe path: " + resolved);
+        } else {
+            assertTrue(resolved.endsWith("bin/python3")
+                    || resolved.endsWith("bin\\python3"),
+                    "should fall back to bin/python3 path: " + resolved);
+        }
     }
 
     @Test

@@ -1264,18 +1264,15 @@ public class PythonEmbedPool implements AutoCloseable {
     private void ensureMinPool() {
         if (closed) return;
 
-        int current;
-        while ((current = currentSize.get()) < minPool) {
-            if (currentSize.compareAndSet(current, current + 1)) {
-                try {
-                    PythonEmbed embed = createEmbed();
-                    instances.add(new PooledInstance(embed));
-                } catch (Exception e) {
-                    currentSize.decrementAndGet();
-                    logger.log(Level.WARNING,
-                            "Failed to create instance for minPool guarantee", e);
-                    break;
-                }
+        while (currentSize.get() < minPool) {
+            try {
+                PythonEmbed embed = createEmbed();
+                instances.add(new PooledInstance(embed));
+                currentSize.incrementAndGet();
+            } catch (Exception e) {
+                logger.log(Level.WARNING,
+                        "Failed to create instance for minPool guarantee", e);
+                break;
             }
         }
     }
