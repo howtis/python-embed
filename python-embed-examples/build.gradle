@@ -24,6 +24,8 @@ subprojects {
 
 def heavyExamples = ['numpy-basic', 'pandas-dataframe', 'spring-boot-example']
 
+evaluationDependsOnChildren()
+
 tasks.register('runAllExamples') {
     group = 'verification'
     description = 'Runs all example subprojects with timeouts and failure isolation'
@@ -31,6 +33,16 @@ tasks.register('runAllExamples') {
     def results = [:]
     def defaultTimeoutMs = 90_000L
     def heavyTimeoutMs = 120_000L
+
+    // Ensure every example subproject is compiled before execution
+    subprojects.each { subproject ->
+        if (subproject.plugins.hasPlugin('application')) {
+            def mainClass = subproject.application.mainClass.getOrNull()
+            if (mainClass != null) {
+                dependsOn "${subproject.path}:classes"
+            }
+        }
+    }
 
     doLast {
         subprojects.each { subproject ->
