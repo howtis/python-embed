@@ -38,13 +38,7 @@ try (PythonEmbed py = PythonEmbed.create()) {
 
 ## Why Batch?
 
-Each `eval()`/`exec()` call involves:
-1. Serialize request (MessagePack)
-2. Write to stdin (flush)
-3. Read from stdout
-4. Deserialize response (MessagePack)
-
-Batch operations combine all requests into one MessagePack frame, eliminating N-1 round-trips.
+Each `eval()`/`exec()` call involves a full round-trip: serialize, write to stdin, read from stdout, and deserialize. Batch operations combine all requests into a single frame, eliminating N-1 round-trips.
 
 ## Batch with Pool
 

@@ -4,13 +4,13 @@ How PythonEmbed works under the hood.
 
 ## Overview
 
-PythonEmbed uses a **subprocess + MessagePack** model:
+PythonEmbed uses a **subprocess** model:
 
 ```
-┌─────────────┐     MessagePack frames      ┌──────────────────┐
-│  JVM (Java) │ ◄──────────────────────────► │ CPython process  │
-│             │     via stdin / stdout       │ (bridge.py)      │
-└─────────────┘                              └──────────────────┘
+┌─────────────┐                          ┌──────────────────┐
+│  JVM (Java) │ ◄──────────────────────► │ CPython process  │
+│             │  via stdin / stdout      │ (bridge.py)      │
+└─────────────┘                          └──────────────────┘
 ```
 
 Key design choices:
@@ -21,23 +21,7 @@ Key design choices:
 
 ## Communication Protocol
 
-All communication happens via **MessagePack** binary protocol over stdin/stdout:
-
-1. Java serializes a request (eval/exec/ref/callback/etc.) as a MessagePack frame
-2. The frame is prefixed with a 4-byte big-endian length header
-3. Python's `bridge.py` reads the length, then the full frame
-4. Python processes the request and writes a response frame back
-5. Java reads the response, deserializes, and returns the result
-
-### Why MessagePack?
-
-| Format | Size (typical) | Speed | Python support |
-|--------|---------------|-------|---------------|
-| MessagePack | ~50 bytes | Fast (binary) | `msgpack` package |
-| JSON | ~120 bytes | Medium | Built-in |
-| Pickle | ~40 bytes | Fast | Built-in (unsafe) |
-
-MessagePack provides a compact binary format with strong typing, making it well-suited for cross-process communication over stdin/stdout.
+All communication happens via a binary protocol over stdin/stdout. Each request is serialized, prefixed with a 4-byte big-endian length header, and read by `bridge.py`. Python processes the request and writes a response frame back.
 
 ## Process Lifecycle
 
