@@ -4,15 +4,6 @@ Run Python code from Java — with full CPython compatibility and zero setup.
 
 PythonEmbed embeds a real CPython interpreter in your JVM application via a subprocess + [MessagePack](https://msgpack.org/) binary protocol — just pure Java and CPython. All C extensions (numpy, scipy, torch) work out of the box.
 
-## Why PythonEmbed?
-
-| Concern | PythonEmbed | Jython/GraalPy |
-|---------|------------|----------------|
-| CPython compatibility | Full — numpy, scipy, torch, all C extensions | Limited to pure Python |
-| Crash isolation | Python segfaults never kill the JVM | Native crash kills the JVM |
-| Setup | One Gradle plugin line | Manual venv or JVM flag configuration |
-| Performance | MessagePack binary protocol, 2–5× faster than JSON | In-process (JNI-based) |
-
 ## Quick Look
 
 Add the Gradle plugin:

@@ -37,7 +37,7 @@ All communication happens via **MessagePack** binary protocol over stdin/stdout:
 | JSON | ~120 bytes | Medium | Built-in |
 | Pickle | ~40 bytes | Fast | Built-in (unsafe) |
 
-MessagePack is 2-5× faster than JSON for typical workloads and produces smaller payloads. Pickle is faster but not safe for cross-process communication.
+MessagePack provides a compact binary format with strong typing, making it well-suited for cross-process communication over stdin/stdout.
 
 ## Process Lifecycle
 

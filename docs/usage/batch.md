@@ -44,7 +44,7 @@ Each `eval()`/`exec()` call involves:
 3. Read from stdout
 4. Deserialize response (MessagePack)
 
-Batch operations combine all requests into one MessagePack frame, eliminating N-1 round-trips. For many small evaluations, this can be **10-20× faster**.
+Batch operations combine all requests into one MessagePack frame, eliminating N-1 round-trips.
 
 ## Batch with Pool
 

@@ -10,7 +10,6 @@ Demonstrates batch evaluation and execution — sending multiple requests in a s
 - `batchExec()` executes multiple statements in one round-trip
 - Pool batch operations return `CompletableFuture<List<PythonValue>>`
 - Timeout applies to the entire batch, not per-item
-- 10-20× faster than sequential `eval()` for many small operations
 
 ## Run It
 
