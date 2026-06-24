@@ -1361,7 +1361,6 @@
 <li><code>batchExec()</code> executes multiple statements in one round-trip</li>
 <li>Pool batch operations return <code>CompletableFuture&lt;List&lt;PythonValue&gt;&gt;</code></li>
 <li>Timeout applies to the entire batch, not per-item</li>
-<li>10-20× faster than sequential <code>eval()</code> for many small operations</li>
 </ul>
 <h2 id="run-it">Run It</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./gradlew<span class="w"> </span>:python-embed-examples:batch-operations:run

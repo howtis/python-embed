@@ -290,17 +290,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-pythonembed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why PythonEmbed?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#quick-look" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1320,17 +1309,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-pythonembed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why PythonEmbed?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#quick-look" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1375,38 +1353,6 @@
 <h1 id="pythonembed">PythonEmbed</h1>
 <p>Run Python code from Java — with full CPython compatibility and zero setup.</p>
 <p>PythonEmbed embeds a real CPython interpreter in your JVM application via a subprocess + <a href="https://msgpack.org/">MessagePack</a> binary protocol — just pure Java and CPython. All C extensions (numpy, scipy, torch) work out of the box.</p>
-<h2 id="why-pythonembed">Why PythonEmbed?</h2>
-<table>
-<thead>
-<tr>
-<th>Concern</th>
-<th>PythonEmbed</th>
-<th>Jython/GraalPy</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CPython compatibility</td>
-<td>Full — numpy, scipy, torch, all C extensions</td>
-<td>Limited to pure Python</td>
-</tr>
-<tr>
-<td>Crash isolation</td>
-<td>Python segfaults never kill the JVM</td>
-<td>Native crash kills the JVM</td>
-</tr>
-<tr>
-<td>Setup</td>
-<td>One Gradle plugin line</td>
-<td>Manual venv or JVM flag configuration</td>
-</tr>
-<tr>
-<td>Performance</td>
-<td>MessagePack binary protocol, 2–5× faster than JSON</td>
-<td>In-process (JNI-based)</td>
-</tr>
-</tbody>
-</table>
 <h2 id="quick-look">Quick Look</h2>
 <p>Add the Gradle plugin:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">plugins</span><span class="w"> </span><span class="o">{</span>
