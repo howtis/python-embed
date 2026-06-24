@@ -13,6 +13,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -39,17 +40,41 @@ public class PythonEmbedAutoConfiguration {
     static PythonEmbed.Options buildOptions(PythonEmbedProperties props) {
         PythonEmbed.Options.Builder builder = PythonEmbed.Options.builder();
 
+        var opts = props.getOptions();
+
         String venvPath = props.getVenvPath();
         if (venvPath != null && !venvPath.isBlank()) {
             builder.venvPath(Path.of(venvPath));
         }
 
-        long timeoutMs = props.getOptions().getTimeoutMs();
+        long timeoutMs = opts.getTimeoutMs();
         if (timeoutMs > 0) {
             builder.timeoutMs(timeoutMs);
         }
 
-        var env = props.getOptions().getEnvironmentVars();
+        int maxCodeLength = opts.getMaxCodeLength();
+        if (maxCodeLength > 0) {
+            builder.maxCodeLength(maxCodeLength);
+        }
+
+        long startupTimeoutMs = opts.getStartupTimeoutMs();
+        if (startupTimeoutMs > 0) {
+            builder.startupTimeoutMs(startupTimeoutMs);
+        }
+
+        String pythonExecutable = opts.getPythonExecutable();
+        if (pythonExecutable != null && !pythonExecutable.isBlank()) {
+            builder.pythonExecutable(pythonExecutable);
+        }
+
+        List<String> warmupScripts = opts.getWarmupScripts();
+        if (warmupScripts != null && !warmupScripts.isEmpty()) {
+            builder.warmupScripts(warmupScripts);
+        }
+
+        builder.lenientWarmup(opts.isLenientWarmup());
+
+        var env = opts.getEnvironmentVars();
         if (env != null && !env.isEmpty()) {
             builder.env(env);
         }

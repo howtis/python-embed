@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for {@link PythonEmbedAutoConfiguration#buildOptions(PythonEmbedProperties)}.
  *
- * <p>Verifies the 3 branching paths: venvPath, timeoutMs, environmentVars.
+ * <p>Verifies all property-to-option mappings.
  */
 class PythonEmbedOptionsBuildTest {
 
@@ -40,7 +40,6 @@ class PythonEmbedOptionsBuildTest {
 
     @Test
     void timeoutMsZeroFallsBackToBuilderDefault() {
-        // timeoutMs == 0 → buildOptions skips setting it, builder default (30_000) is used
         var props = bind(Map.of());
         props.getOptions().setTimeoutMs(0);
         var options = PythonEmbedAutoConfiguration.buildOptions(props);
@@ -52,6 +51,79 @@ class PythonEmbedOptionsBuildTest {
         var props = bind(Map.of("python-embed.options.timeout-ms", "5000"));
         var options = PythonEmbedAutoConfiguration.buildOptions(props);
         assertThat(options.timeoutMs()).isEqualTo(5000L);
+    }
+
+    @Test
+    void maxCodeLengthDefault() {
+        var props = bind(Map.of());
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.maxCodeLength()).isEqualTo(100_000);
+    }
+
+    @Test
+    void maxCodeLengthCustom() {
+        var props = bind(Map.of("python-embed.options.max-code-length", "50000"));
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.maxCodeLength()).isEqualTo(50_000);
+    }
+
+    @Test
+    void startupTimeoutMsDefault() {
+        var props = bind(Map.of());
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.startupTimeoutMs()).isEqualTo(30_000L);
+    }
+
+    @Test
+    void startupTimeoutMsCustom() {
+        var props = bind(Map.of("python-embed.options.startup-timeout-ms", "10000"));
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.startupTimeoutMs()).isEqualTo(10_000L);
+    }
+
+    @Test
+    void pythonExecutableNullByDefault() {
+        var props = bind(Map.of());
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.pythonExecutable()).isNull();
+    }
+
+    @Test
+    void pythonExecutableCustom() {
+        var props = bind(Map.of("python-embed.options.python-executable", "/usr/bin/python3.12"));
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.pythonExecutable()).isEqualTo("/usr/bin/python3.12");
+    }
+
+    @Test
+    void warmupScriptsEmptyByDefault() {
+        var props = bind(Map.of());
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.warmupScripts()).isEmpty();
+    }
+
+    @Test
+    void warmupScriptsCustom() {
+        var props = bind(Map.of(
+                "python-embed.options.warmup-scripts[0]", "import numpy as np",
+                "python-embed.options.warmup-scripts[1]", "import torch"
+        ));
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.warmupScripts()).containsExactly("import numpy as np", "import torch");
+    }
+
+    @Test
+    void lenientWarmupDefaultTrue() {
+        var props = bind(Map.of());
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.lenientWarmup()).isTrue();
+    }
+
+    @Test
+    void lenientWarmupCustomFalse() {
+        var props = bind(Map.of("python-embed.options.lenient-warmup", "false"));
+        var options = PythonEmbedAutoConfiguration.buildOptions(props);
+        assertThat(options.lenientWarmup()).isFalse();
     }
 
     @Test
