@@ -2,6 +2,8 @@ plugins {
     id 'io.github.howtis.python-embed'
 }
 
+version = '1.0.2-SNAPSHOT'
+
 dependencies {
     implementation 'org.msgpack:msgpack-core:0.9.8'
     implementation 'org.slf4j:slf4j-api:2.0.16'
