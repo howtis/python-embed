@@ -33,7 +33,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run all examples
-        run: ./gradlew :python-embed-examples:runAllExamples
+        run: ./gradlew -p python-embed-examples runAllExamples
 
       - name: Upload failure logs
         if: failure()
