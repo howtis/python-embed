@@ -214,6 +214,93 @@ class VenvTaskTest {
     }
 
     // ------------------------------------------------------------------
+    // detectTargetTriple (target OS for cross-compilation)
+    // ------------------------------------------------------------------
+
+    @Test
+    void detectTargetTriple_default_returnsBuildOsTriple() {
+        String triple = task.detectTargetTriple();
+        assertNotNull(triple);
+        // Must include at least one known component
+        assertTrue(triple.contains("pc-windows")
+                || triple.contains("apple-darwin")
+                || triple.contains("linux-gnu"));
+    }
+
+    @Test
+    void detectTargetTriple_windows_returnsWindowsTriple() {
+        task.getTargetOs().set("windows");
+        assertEquals("x86_64-pc-windows-msvc", task.detectTargetTriple());
+    }
+
+    @Test
+    void detectTargetTriple_linux_returnsLinuxTriple() {
+        task.getTargetOs().set("linux");
+        String triple = task.detectTargetTriple();
+        assertTrue(triple.startsWith("x86_64") || triple.startsWith("aarch64"));
+        assertTrue(triple.contains("linux-gnu"));
+    }
+
+    @Test
+    void detectTargetTriple_macos_returnsMacosTriple() {
+        task.getTargetOs().set("macos");
+        String triple = task.detectTargetTriple();
+        assertTrue(triple.startsWith("x86_64") || triple.startsWith("aarch64"));
+        assertTrue(triple.contains("apple-darwin"));
+    }
+
+    @Test
+    void detectTargetTriple_caseInsensitive() {
+        task.getTargetOs().set("Windows");
+        assertEquals("x86_64-pc-windows-msvc", task.detectTargetTriple());
+    }
+
+    // ------------------------------------------------------------------
+    // findPythonInDir with explicit target OS (cross-compilation)
+    // ------------------------------------------------------------------
+
+    @Test
+    void findPythonInDir_windowsTarget_findsExe(@TempDir Path tempDir) throws Exception {
+        task.getTargetOs().set("windows");
+        Path expected = createPythonExeForOs(tempDir, "windows");
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void findPythonInDir_linuxTarget_findsBinPython3(@TempDir Path tempDir) throws Exception {
+        task.getTargetOs().set("linux");
+        Path expected = createPythonExeForOs(tempDir, "linux");
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void findPythonInDir_macosTarget_findsBinPython3(@TempDir Path tempDir) throws Exception {
+        task.getTargetOs().set("macos");
+        Path expected = createPythonExeForOs(tempDir, "macos");
+
+        Path result = task.findPythonInDir(tempDir);
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void findPythonInDir_windowsTarget_noExe_returnsNull(@TempDir Path tempDir) throws Exception {
+        task.getTargetOs().set("windows");
+        // No python.exe created -- should return null
+        assertNull(task.findPythonInDir(tempDir));
+    }
+
+    @Test
+    void findPythonInDir_linuxTarget_noExe_returnsNull(@TempDir Path tempDir) throws Exception {
+        task.getTargetOs().set("linux");
+        // No bin/python3 created -- should return null
+        assertNull(task.findPythonInDir(tempDir));
+    }
+
+    // ------------------------------------------------------------------
     // Tar/ZipSlip: path traversal protection
     // ------------------------------------------------------------------
 
@@ -344,6 +431,23 @@ class VenvTaskTest {
 
     private static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    /**
+     * Creates the Python executable layout for the specified target OS.
+     * Used to simulate cross-compilation scenarios regardless of build OS.
+     */
+    private Path createPythonExeForOs(Path baseDir, String targetOs) throws IOException {
+        Path exe;
+        if ("windows".equals(targetOs)) {
+            Files.createDirectories(baseDir);
+            exe = baseDir.resolve("python.exe");
+        } else {
+            exe = baseDir.resolve("bin").resolve("python3");
+        }
+        Files.createDirectories(exe.getParent());
+        Files.createFile(exe);
+        return exe;
     }
 
     /** Creates the primary (preferred) Python executable for the current OS. */

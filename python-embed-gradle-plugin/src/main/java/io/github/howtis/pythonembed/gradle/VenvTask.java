@@ -90,6 +90,11 @@ public abstract class VenvTask extends DefaultTask {
     @Input
     public abstract ListProperty<String> getPipExtraArgs();
 
+    /** Target OS for cross-compilation: "windows", "linux", "macos" (null = auto-detect). */
+    @Optional
+    @Input
+    public abstract Property<String> getTargetOs();
+
     @TaskAction
     public void createVenv() {
         List<String> packages = new ArrayList<>(getPackages().get());
@@ -402,8 +407,8 @@ public abstract class VenvTask extends DefaultTask {
             logger.info("Flattening to: " + outputDir);
             copyDirectory(installDir, outputDir.toPath());
 
-            // Make executables runnable on Unix
-            if (!isWindows()) {
+            // Make executables runnable on Unix (respect target OS for cross-compilation)
+            if (!isTargetWindows()) {
                 makeExecutables(outputDir.toPath());
             }
         } finally {
@@ -418,10 +423,10 @@ public abstract class VenvTask extends DefaultTask {
     }
 
     Path findPythonInDir(Path dir) {
-        // After flattening, the layout is:
+        // After flattening, the layout depends on the target OS:
         //   Windows: python.exe at root (bundled) or Scripts/python.exe (venv)
         //   Unix:    bin/python3 or bin/python
-        if (isWindows()) {
+        if (isTargetWindows()) {
             Path exe = dir.resolve("python.exe");
             if (Files.exists(exe)) return exe;
             exe = dir.resolve("Scripts").resolve("python.exe");
@@ -435,22 +440,24 @@ public abstract class VenvTask extends DefaultTask {
         return null;
     }
 
-    private String detectTargetTriple() {
-        String os = System.getProperty("os.name", "").toLowerCase();
+    String detectTargetTriple() {
+        String targetOs = resolveTargetOs();
         String arch = System.getProperty("os.arch", "").toLowerCase();
-        if (os.contains("win")) {
-            return "x86_64-pc-windows-msvc";
-        } else if (os.contains("mac")) {
-            if (arch.contains("aarch64") || arch.contains("arm")) {
-                return "aarch64-apple-darwin";
+        return switch (targetOs) {
+            case "windows" -> "x86_64-pc-windows-msvc";
+            case "macos" -> {
+                if (arch.contains("aarch64") || arch.contains("arm")) {
+                    yield "aarch64-apple-darwin";
+                }
+                yield "x86_64-apple-darwin";
             }
-            return "x86_64-apple-darwin";
-        } else {
-            if (arch.contains("aarch64") || arch.contains("arm64")) {
-                return "aarch64-unknown-linux-gnu";
+            default -> {
+                if (arch.contains("aarch64") || arch.contains("arm64")) {
+                    yield "aarch64-unknown-linux-gnu";
+                }
+                yield "x86_64-unknown-linux-gnu";
             }
-            return "x86_64-unknown-linux-gnu";
-        }
+        };
     }
 
     private HttpURLConnection createGitHubConnection(URI uri) throws IOException {
@@ -594,6 +601,26 @@ public abstract class VenvTask extends DefaultTask {
 
     private boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    private static boolean isMac() {
+        return System.getProperty("os.name", "").toLowerCase().contains("mac");
+    }
+
+    /** Returns the effective target OS: user-configured value or auto-detected build OS. */
+    private String resolveTargetOs() {
+        String target = getTargetOs().getOrNull();
+        if (target != null && !target.isEmpty()) {
+            return target.toLowerCase();
+        }
+        if (isWindows()) return "windows";
+        if (isMac()) return "macos";
+        return "linux";
+    }
+
+    /** True when the effective target OS is Windows. */
+    private boolean isTargetWindows() {
+        return "windows".equals(resolveTargetOs());
     }
 
     private void copyDirectory(Path source, Path target) throws IOException {

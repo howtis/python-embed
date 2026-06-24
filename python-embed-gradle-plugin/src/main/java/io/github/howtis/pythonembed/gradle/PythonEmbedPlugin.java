@@ -71,6 +71,7 @@ public class PythonEmbedPlugin implements Plugin<Project> {
             task.getPythonVersion().set(extension.getPythonVersion());
             task.getPipIndexUrl().set(extension.getPipIndexUrl());
             task.getPipExtraArgs().set(extension.getPipExtraArgs());
+            task.getTargetOs().set(extension.getTargetOs());
             task.setGroup(LifecycleBasePlugin.BUILD_GROUP);
             task.setDescription("Creates a Python venv and installs specified packages.");
         });

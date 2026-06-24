@@ -47,6 +47,17 @@ public abstract class PythonEmbedExtension {
     /** Optional path to pyproject.toml (relative to project root). */
     public abstract Property<String> getPyprojectTomlFile();
 
+    /**
+     * Target OS for cross-compilation. When set, the plugin downloads the
+     * python-build-standalone archive for the specified OS instead of the
+     * build OS. This only affects the bundled Python path (system Python
+     * always uses the build OS).
+     *
+     * <p>Valid values: {@code "windows"}, {@code "linux"}, {@code "macos"}
+     * (case-insensitive). When not set, the build OS is auto-detected.
+     */
+    public abstract Property<String> getTargetOs();
+
     public PythonEmbedExtension() {
         getPythonVersion().convention("3.12");
         getPackages().convention(java.util.List.of());
