@@ -6,11 +6,11 @@ Add the plugin to `build.gradle`:
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.1'
+    id 'io.github.howtis.python-embed' version '1.0.2'
 }
 
 dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.1'
+    implementation 'io.github.howtis:python-embed-runtime:1.0.2'
 }
 ```
 
@@ -44,7 +44,7 @@ For Spring Boot 3.x applications, add the starter:
 
 ```groovy
 dependencies {
-    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.1'
+    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.2'
 }
 ```
 

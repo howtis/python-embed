@@ -33,7 +33,7 @@ import java.util.Properties;
  * <p>Usage:
  * <pre>{@code
  * plugins {
- *     id 'io.github.howtis.python-embed' version '1.0.1'
+ *     id 'io.github.howtis.python-embed' version '1.0.2'
  * }
  * pythonEmbed {
  *     packages = ['numpy==1.26.4']
