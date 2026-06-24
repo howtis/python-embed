@@ -621,23 +621,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Communication Protocol">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-messagepack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why MessagePack?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1447,23 +1430,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Communication Protocol">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-messagepack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why MessagePack?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1589,11 +1555,11 @@
 <h1 id="architecture">Architecture</h1>
 <p>How PythonEmbed works under the hood.</p>
 <h2 id="overview">Overview</h2>
-<p>PythonEmbed uses a <strong>subprocess + MessagePack</strong> model:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────┐     MessagePack frames      ┌──────────────────┐
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  JVM (Java) │ ◄──────────────────────────► │ CPython process  │
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│             │     via stdin / stdout       │ (bridge.py)      │
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>└─────────────┘                              └──────────────────┘
+<p>PythonEmbed uses a <strong>subprocess</strong> model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────┐                          ┌──────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  JVM (Java) │ ◄──────────────────────► │ CPython process  │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│             │  via stdin / stdout      │ (bridge.py)      │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>└─────────────┘                          └──────────────────┘
 </code></pre></div>
 <p>Key design choices:</p>
 <ul>
@@ -1602,46 +1568,7 @@
 <li><strong>One Python process per PythonEmbed</strong> — shared namespace, sequential-by-default, pool for concurrency</li>
 </ul>
 <h2 id="communication-protocol">Communication Protocol</h2>
-<p>All communication happens via <strong>MessagePack</strong> binary protocol over stdin/stdout:</p>
-<ol>
-<li>Java serializes a request (eval/exec/ref/callback/etc.) as a MessagePack frame</li>
-<li>The frame is prefixed with a 4-byte big-endian length header</li>
-<li>Python's <code>bridge.py</code> reads the length, then the full frame</li>
-<li>Python processes the request and writes a response frame back</li>
-<li>Java reads the response, deserializes, and returns the result</li>
-</ol>
-<h3 id="why-messagepack">Why MessagePack?</h3>
-<table>
-<thead>
-<tr>
-<th>Format</th>
-<th>Size (typical)</th>
-<th>Speed</th>
-<th>Python support</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>MessagePack</td>
-<td>~50 bytes</td>
-<td>Fast (binary)</td>
-<td><code>msgpack</code> package</td>
-</tr>
-<tr>
-<td>JSON</td>
-<td>~120 bytes</td>
-<td>Medium</td>
-<td>Built-in</td>
-</tr>
-<tr>
-<td>Pickle</td>
-<td>~40 bytes</td>
-<td>Fast</td>
-<td>Built-in (unsafe)</td>
-</tr>
-</tbody>
-</table>
-<p>MessagePack provides a compact binary format with strong typing, making it well-suited for cross-process communication over stdin/stdout.</p>
+<p>All communication happens via a binary protocol over stdin/stdout. Each request is serialized, prefixed with a 4-byte big-endian length header, and read by <code>bridge.py</code>. Python processes the request and writes a response frame back.</p>
 <h2 id="process-lifecycle">Process Lifecycle</h2>
 <h3 id="startup">Startup</h3>
 <ol>

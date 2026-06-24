@@ -1447,12 +1447,7 @@
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="why-batch">Why Batch?</h2>
-<p>Each <code>eval()</code>/<code>exec()</code> call involves:
-1. Serialize request (MessagePack)
-2. Write to stdin (flush)
-3. Read from stdout
-4. Deserialize response (MessagePack)</p>
-<p>Batch operations combine all requests into one MessagePack frame, eliminating N-1 round-trips.</p>
+<p>Each <code>eval()</code>/<code>exec()</code> call involves a full round-trip: serialize, write to stdin, read from stdout, and deserialize. Batch operations combine all requests into a single frame, eliminating N-1 round-trips.</p>
 <h2 id="batch-with-pool">Batch with Pool</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">try</span><span class="w"> </span><span class="p">(</span><span class="n">PythonEmbedPool</span><span class="w"> </span><span class="n">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PythonEmbedPool</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">        </span><span class="p">.</span><span class="na">minPool</span><span class="p">(</span><span class="mi">2</span><span class="p">).</span><span class="na">maxPool</span><span class="p">(</span><span class="mi">8</span><span class="p">).</span><span class="na">options</span><span class="p">(</span><span class="n">PythonEmbed</span><span class="p">.</span><span class="na">Options</span><span class="p">.</span><span class="na">defaults</span><span class="p">())</span>
