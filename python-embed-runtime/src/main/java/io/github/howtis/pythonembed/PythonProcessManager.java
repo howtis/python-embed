@@ -315,23 +315,23 @@ class PythonProcessManager {
         if (isWindows) {
             Path venvPy = basePath.resolve("Scripts").resolve("python.exe");
             if (venvPy.toFile().exists()) {
-                return venvPy.toString();
+                return venvPy.toAbsolutePath().toString();
             }
             Path standalonePy = basePath.resolve("python.exe");
             if (standalonePy.toFile().exists()) {
-                return standalonePy.toString();
+                return standalonePy.toAbsolutePath().toString();
             }
-            return venvPy.toString();
+            return venvPy.toAbsolutePath().toString();
         } else {
             Path python3 = basePath.resolve("bin").resolve("python3");
             if (python3.toFile().exists()) {
-                return python3.toString();
+                return python3.toAbsolutePath().toString();
             }
             Path python = basePath.resolve("bin").resolve("python");
             if (python.toFile().exists()) {
-                return python.toString();
+                return python.toAbsolutePath().toString();
             }
-            return python3.toString();
+            return python3.toAbsolutePath().toString();
         }
     }
 }
