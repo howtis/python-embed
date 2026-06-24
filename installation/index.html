@@ -379,6 +379,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#extension-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1383,6 +1394,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#extension-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1449,7 +1471,7 @@
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">        </span><span class="s1">&#39;torch&#39;</span><span class="o">,</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="s1">&#39;msgpack&#39;</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="o">]</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">requirements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file</span><span class="o">(</span><span class="s1">&#39;requirements.txt&#39;</span><span class="o">)</span><span class="w">  </span><span class="c1">// alternative to packages</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">requirementsFile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;requirements.txt&#39;</span><span class="w">  </span><span class="c1">// alternative to packages</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="o">}</span>
 </code></pre></div>
 <h3 id="how-it-works">How It Works</h3>
@@ -1459,6 +1481,67 @@
 <li>If not found → downloads <a href="https://github.com/astral-sh/python-build-standalone">python-build-standalone</a> (~50 MB, cached) and installs packages directly</li>
 <li>Packages the venv as a JAR resource for runtime extraction</li>
 </ol>
+<h3 id="extension-properties">Extension Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>packages</code></td>
+<td><code>List&lt;String&gt;</code></td>
+<td><code>[]</code></td>
+<td>Pip packages to install</td>
+</tr>
+<tr>
+<td><code>requirementsFile</code></td>
+<td><code>String</code></td>
+<td>—</td>
+<td>Path to <code>requirements.txt</code> (relative to project root)</td>
+</tr>
+<tr>
+<td><code>pyprojectTomlFile</code></td>
+<td><code>String</code></td>
+<td>—</td>
+<td>Path to <code>pyproject.toml</code> (relative to project root)</td>
+</tr>
+<tr>
+<td><code>pythonVersion</code></td>
+<td><code>String</code></td>
+<td><code>3.12</code></td>
+<td>Python version (for python-build-standalone)</td>
+</tr>
+<tr>
+<td><code>pipIndexUrl</code></td>
+<td><code>String</code></td>
+<td>—</td>
+<td>Custom pip index URL (e.g., PyTorch CUDA)</td>
+</tr>
+<tr>
+<td><code>pipExtraArgs</code></td>
+<td><code>List&lt;String&gt;</code></td>
+<td><code>[]</code></td>
+<td>Extra pip install arguments (e.g., <code>-f</code>, <code>--extra-index-url</code>)</td>
+</tr>
+<tr>
+<td><code>venvOutputDir</code></td>
+<td><code>Directory</code></td>
+<td><code>build/python-venv</code></td>
+<td>Output directory for the venv</td>
+</tr>
+<tr>
+<td><code>targetOs</code></td>
+<td><code>String</code></td>
+<td>auto-detected</td>
+<td>Cross-compile for <code>windows</code>, <code>linux</code>, or <code>macos</code></td>
+</tr>
+</tbody>
+</table>
 <p>The venv is rebuilt incrementally — only when dependencies change.</p>
 <h2 id="spring-boot-starter">Spring Boot Starter</h2>
 <p>For Spring Boot 3.x applications, add the starter:</p>
