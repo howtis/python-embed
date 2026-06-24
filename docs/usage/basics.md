@@ -54,7 +54,7 @@ try (PythonEmbed py = PythonEmbed.create()) {
 | `asString()` | `String` | `py.eval("'hi'").asString()` |
 | `asList(Class)` | `List<T>` | `py.eval("[1,2,3]").asList(Integer.class)` |
 | `asMap(K,V)` | `Map<K,V>` | `py.eval("{'a':1}").asMap(String.class, Integer.class)` |
-| `asByteArray()` | `byte[]` | `py.eval("b'\\x01\\x02'").asByteArray()` |
+| `asBytes()` | `byte[]` | `py.eval("b'\\x01\\x02'").asBytes()` |
 | `toJson()` | `String` | JSON representation |
 
 ## arg() — Safe Parameter Injection
@@ -71,6 +71,9 @@ PythonEmbed.arg(List.of(1, 2));   // [1, 2]
 PythonEmbed.arg(Set.of(1, 2));    // {1, 2}
 PythonEmbed.arg(Map.of("k", 1));  // {'k': 1}
 PythonEmbed.arg(new byte[]{1,2}); // b'\x01\x02'
+PythonEmbed.arg(LocalDateTime.now());       // datetime.datetime(2024, 1, 15, 10, 30, 0)
+PythonEmbed.arg(LocalDate.of(2024, 1, 15)); // datetime.date(2024, 1, 15)
+PythonEmbed.arg(Instant.now());             // datetime.datetime.fromtimestamp(...)
 
 // Safe — user input can't break out of the string literal:
 String userInput = "Bob'; import os; os.system('rm -rf /') #";

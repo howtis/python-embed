@@ -90,6 +90,8 @@ management:
 
 Access at `/actuator/health`:
 
+**SINGLE mode:**
+
 ```json
 {
   "status": "UP",
@@ -97,17 +99,28 @@ Access at `/actuator/health`:
     "pythonEmbed": {
       "status": "UP",
       "details": {
-        "pid": 12345,
-        "running": true,
-        "rssMB": 45.2,
+        "memoryRssKb": 46284,
         "refCount": 3,
-        "gcGen": 1,
-        "pool": {
-          "size": 3,
-          "active": 1,
-          "minPool": 2,
-          "maxPool": 8
-        }
+        "gcEnabled": true,
+        "gcCounts": [120, 5, 1]
+      }
+    }
+  }
+}
+```
+
+**POOL mode:**
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "pythonEmbed": {
+      "status": "UP",
+      "details": {
+        "size": 3,
+        "minPool": 2,
+        "activeCount": 1
       }
     }
   }
@@ -120,11 +133,15 @@ Access at `/actuator/health`:
 |----------|------|---------|-------------|
 | `python-embed.mode` | `SINGLE` / `POOL` | `SINGLE` | Bean type to create |
 | `python-embed.venv-path` | `String` | auto-resolved | Override venv location |
-| `python-embed.pool.min` | `int` | 2 | Minimum pool size |
-| `python-embed.pool.max` | `int` | 8 | Maximum pool size |
+| `python-embed.pool.min` | `int` | 1 | Minimum pool size |
+| `python-embed.pool.max` | `int` | 1 | Maximum pool size |
 | `python-embed.pool.idle-timeout` | `Duration` | 60s | Idle instance removal |
 | `python-embed.pool.health-check-interval` | `Duration` | 30s | Health ping interval |
 | `python-embed.pool.close-timeout` | `Duration` | 30s | Graceful shutdown timeout |
-| `python-embed.options.timeout-ms` | `long` | 30000 | Per-request timeout |
-| `python-embed.options.startup-timeout-ms` | `long` | 10000 | Process startup timeout |
-| `python-embed.options.environment-vars` | `Map` | — | Environment variables |
+| `python-embed.options.timeout-ms` | `long` | 0 | Per-request timeout (0 = use PythonEmbed default: 30000) |
+| `python-embed.options.startup-timeout-ms` | `long` | 30000 | Process startup timeout |
+| `python-embed.options.max-code-length` | `int` | 100000 | Maximum code length in chars |
+| `python-embed.options.python-executable` | `String` | — | Override Python executable path |
+| `python-embed.options.warmup-scripts` | `List<String>` | — | Warmup scripts to run on startup |
+| `python-embed.options.lenient-warmup` | `boolean` | true | Log warmup failures instead of throwing |
+| `python-embed.options.environment-vars` | `Map` | — | Environment variables passed to Python process |

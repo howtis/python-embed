@@ -25,7 +25,7 @@ pythonEmbed {
         'torch',
         'msgpack'
     ]
-    requirements = file('requirements.txt')  // alternative to packages
+    requirementsFile = 'requirements.txt'  // alternative to packages
 }
 ```
 
@@ -35,6 +35,19 @@ pythonEmbed {
 2. If found → `python -m venv` + `pip install` packages
 3. If not found → downloads [python-build-standalone](https://github.com/astral-sh/python-build-standalone) (~50 MB, cached) and installs packages directly
 4. Packages the venv as a JAR resource for runtime extraction
+
+### Extension Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `packages` | `List<String>` | `[]` | Pip packages to install |
+| `requirementsFile` | `String` | — | Path to `requirements.txt` (relative to project root) |
+| `pyprojectTomlFile` | `String` | — | Path to `pyproject.toml` (relative to project root) |
+| `pythonVersion` | `String` | `3.12` | Python version (for python-build-standalone) |
+| `pipIndexUrl` | `String` | — | Custom pip index URL (e.g., PyTorch CUDA) |
+| `pipExtraArgs` | `List<String>` | `[]` | Extra pip install arguments (e.g., `-f`, `--extra-index-url`) |
+| `venvOutputDir` | `Directory` | `build/python-venv` | Output directory for the venv |
+| `targetOs` | `String` | auto-detected | Cross-compile for `windows`, `linux`, or `macos` |
 
 The venv is rebuilt incrementally — only when dependencies change.
 

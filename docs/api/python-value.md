@@ -15,8 +15,15 @@
 | `asList(Class<T>)` | `List<T>` | `list` | Convert to typed list |
 | `asMap()` | `Map<String, Object>` | `dict` | Convert to raw map |
 | `asMap(Class<K>, Class<V>)` | `Map<K, V>` | `dict` | Convert to typed map |
-| `asByteArray()` | `byte[]` | `bytes` | Convert to byte array |
+| `asBytes()` | `byte[]` | `bytes` | Convert to byte array |
 | `toJson()` | `String` | any | JSON string representation |
+| `toJson(boolean)` | `String` | any | JSON with optional pretty-print |
+| `raw()` | `Object` | any | Get raw Java object |
+| `isNull()` | `boolean` | `None` / `null` | Check if value is null |
+| `asDoubleMap()` | `Map<String, Double>` | `dict` | Number values as Double |
+| `asStringMap()` | `Map<String, String>` | `dict` | String values |
+| `asIntMap()` | `Map<String, Integer>` | `dict` | Integer values |
+| `asLongMap()` | `Map<String, Long>` | `dict` | Long values |
 
 ## Usage Examples
 
@@ -33,7 +40,7 @@ PythonValue dictVal = py.eval("{'a': 1, 'b': 2}");
 Map<String, Integer> map = dictVal.asMap(String.class, Integer.class);
 
 PythonValue bytesVal = py.eval("b'hello'");
-byte[] bytes = bytesVal.asByteArray();
+byte[] bytes = bytesVal.asBytes();
 
 // JSON serialization
 String json = py.eval("{'key': [1, 2, 3]}").toJson();
@@ -43,4 +50,6 @@ String json = py.eval("{'key': [1, 2, 3]}").toJson();
 
 - `asList()` without type parameter returns `List<Object>` — use the typed variant when possible
 - `asMap()` without type parameters returns `Map<String, Object>`
+- Convenience methods `asDoubleMap()`, `asStringMap()`, `asIntMap()`, `asLongMap()` avoid manual type casting
 - `toJson()` serializes the Python value to JSON for logging or transmission
+- `toJson(true)` enables pretty-printed output

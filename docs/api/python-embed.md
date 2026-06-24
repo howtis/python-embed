@@ -13,7 +13,7 @@ Creates a `PythonEmbed` with default options.
 Creates a `PythonEmbed` with the given options.
 
 ### `arg(Object value)`
-Converts a Java value to a safe Python literal string. Supports: `null`, `Boolean`, `Number`, `String`, `List`, `Set`, `Map`, `byte[]`, `Instant`.
+Converts a Java value to a safe Python literal string. Supports: `null`, `Boolean`, `Number`, `String`, `List`, `Set`, `Map`, `byte[]`, `Instant`, `LocalDateTime`, `LocalDate`, `LocalTime`, `ZonedDateTime`.
 
 ## Instance Methods
 
