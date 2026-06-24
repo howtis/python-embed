@@ -1,0 +1,60 @@
+site_name: PythonEmbed
+site_description: Run Python code from Java — with full CPython compatibility and zero setup
+site_url: https://howtis.github.io/python-embed
+repo_url: https://github.com/howtis/python-embed
+repo_name: howtis/python-embed
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Installation: installation.md
+  - Usage:
+      - Basics: usage/basics.md
+      - Pool: usage/pool.md
+      - Object Handles: usage/handles.md
+      - Callbacks: usage/callbacks.md
+      - Streaming: usage/streaming.md
+      - Batch Operations: usage/batch.md
+  - Architecture: architecture.md
+  - Spring Boot: spring-boot.md
+  - Examples:
+      - Overview: examples/index.md
+      - Basic Eval: examples/basic-eval.md
+      - Batch Operations: examples/batch-operations.md
+      - Callback Bridge: examples/callback-bridge.md
+      - Configuration: examples/configuration.md
+      - Error Handling: examples/error-handling.md
+      - Health Monitor: examples/health-monitor.md
+      - Numpy Basic: examples/numpy-basic.md
+      - Object Handle: examples/object-handle.md
+      - Pandas Dataframe: examples/pandas-dataframe.md
+      - Pool Async: examples/pool-async.md
+      - Proxy Object: examples/proxy-object.md
+      - Spring Boot Example: examples/spring-boot-example.md
+      - Streaming: examples/streaming.md
+  - API Reference:
+      - PythonEmbed: api/python-embed.md
+      - PythonEmbedPool: api/python-embed-pool.md
+      - PythonValue: api/python-value.md
+      - PythonHandle: api/python-handle.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - admonition

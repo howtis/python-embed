@@ -15,3 +15,75 @@ subprojects {
         }
     }
 }
+
+// ------------------------------------------------------------------
+// runAllExamples — executes all 13 examples with per-example timeouts
+// and failure isolation. Failures are collected and reported at the
+// end; a single failing example does not block the rest.
+// ------------------------------------------------------------------
+
+def heavyExamples = ['numpy-basic', 'pandas-dataframe', 'spring-boot-example']
+
+tasks.register('runAllExamples') {
+    group = 'verification'
+    description = 'Runs all example subprojects with timeouts and failure isolation'
+
+    def results = [:]
+    def defaultTimeoutMs = 90_000L
+    def heavyTimeoutMs = 120_000L
+
+    doLast {
+        subprojects.each { subproject ->
+            if (!subproject.plugins.hasPlugin('application')) return
+
+            def mainClass = subproject.application.mainClass.getOrNull()
+            if (mainClass == null) return
+
+            def name = subproject.name
+            def timeoutMs = heavyExamples.contains(name) ? heavyTimeoutMs : defaultTimeoutMs
+            def timeoutDuration = java.time.Duration.ofMillis(timeoutMs)
+
+            logger.lifecycle("Running {} (timeout={}s)...", name, timeoutMs / 1000)
+
+            def start = System.currentTimeMillis()
+            def result
+            try {
+                javaexec {
+                    classpath = subproject.sourceSets.main.runtimeClasspath
+                    mainClass = mainClass
+                    timeout = timeoutDuration
+                    maxHeapSize = '512m'
+                }
+                def elapsed = System.currentTimeMillis() - start
+                logger.lifecycle("  PASS {} ({}ms)", name, elapsed)
+                results[name] = [status: 'PASS', elapsed: elapsed]
+            } catch (Exception e) {
+                def elapsed = System.currentTimeMillis() - start
+                logger.error("  FAIL {} ({}ms): {}", name, elapsed, e.message)
+                results[name] = [status: 'FAIL', elapsed: elapsed, error: e.message]
+            }
+        }
+
+        // Print summary
+        logger.lifecycle("")
+        logger.lifecycle("=" * 60)
+        logger.lifecycle("runAllExamples Summary")
+        logger.lifecycle("=" * 60)
+
+        def passCount = 0
+        def failCount = 0
+        results.sort { it.key }.each { name, r ->
+            def status = r.status == 'PASS' ? 'PASS' : 'FAIL'
+            def marker = r.status == 'PASS' ? '[PASS]' : '[FAIL]'
+            logger.lifecycle("  {} {} ({}ms)", marker, name, r.elapsed)
+            if (r.status == 'PASS') passCount++ else failCount++
+        }
+
+        logger.lifecycle("")
+        logger.lifecycle("Total: {} passed, {} failed out of {}", passCount, failCount, results.size())
+
+        if (failCount > 0) {
+            throw new GradleException("${failCount} example(s) failed. See log above for details.")
+        }
+    }
+}

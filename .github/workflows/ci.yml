@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  examples:
+    name: Run Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Cache Python standalone
+        uses: actions/cache@v4
+        with:
+          path: ~/.python-embed
+          key: python-standalone-${{ runner.os }}-${{ hashFiles('python-embed-gradle-plugin/src/**') }}
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run all examples
+        run: ./gradlew :python-embed-examples:runAllExamples
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-failure-logs
+          path: |
+            **/build/reports/
+            **/hs_err_pid*.log
+          retention-days: 7
