@@ -57,7 +57,7 @@ For Spring Boot 3.x applications, add the starter:
 
 ```groovy
 dependencies {
-    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.2'
+    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.3'
 }
 ```
 

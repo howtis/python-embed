@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.3] - 2026-06-25
+
+### Fixed
+- `NoClassDefFoundError` on `HealthIndicator` when Spring Boot Actuator is not on the classpath
+
 ## [1.0.2] - 2026-06-24
 
 ### Added
@@ -25,6 +30,7 @@
 - `@ConfigurationProperties` binding for all pool and runtime settings
 - Auto-configuration conditional on `python-embed-runtime` on classpath
 
+[starter-v1.0.3]: https://github.com/howtis/python-embed/releases/tag/starter-v1.0.3
 [starter-v1.0.2]: https://github.com/howtis/python-embed/releases/tag/starter-v1.0.2
 [starter-v1.0.1]: https://github.com/howtis/python-embed/releases/tag/v1.0.1
 [starter-v1.0.0]: https://github.com/howtis/python-embed/releases/tag/v1.0.0

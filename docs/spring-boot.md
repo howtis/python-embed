@@ -8,7 +8,7 @@ Add the starter dependency:
 
 ```groovy
 dependencies {
-    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.2'
+    implementation 'io.github.howtis:python-embed-spring-boot-starter:1.0.3'
 }
 ```
 

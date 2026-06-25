@@ -1,10 +1,14 @@
 # Changelog
 
+## [1.0.3] - 2026-06-25
+
+- [python-embed-spring-boot-starter](python-embed-spring-boot-starter/CHANGELOG.md) (1.0.3) — Fixed `NoClassDefFoundError` without Actuator, HealthIndicator bean isolation
+
 ## [1.0.2] - 2026-06-24
 
 Modules are now independently versioned with per-module changelogs:
 - [python-embed-runtime](python-embed-runtime/CHANGELOG.md) (1.0.2) — independent versioning with `runtime-v*` publish tags
-- [python-embed-spring-boot-starter](python-embed-spring-boot-starter/CHANGELOG.md) (1.0.2) — Configuration Metadata, missing option properties, independent versioning
+- [python-embed-spring-boot-starter](python-embed-spring-boot-starter/CHANGELOG.md) (1.0.3) — Fixed `NoClassDefFoundError` without Actuator, HealthIndicator bean isolation
 - [python-embed-gradle-plugin](python-embed-gradle-plugin/CHANGELOG.md) (1.0.2) — `targetOs` cross-compilation, cross-platform fix, plugin-publish 2.1.1, independent versioning
 
 ## [1.0.1] - 2026-06-23
@@ -35,6 +39,7 @@ Modules are now independently versioned with per-module changelogs:
 - Close hook support for resource cleanup
 - 13 example applications in `python-embed-examples`
 
+[1.0.3]: See per-module changelogs above
 [1.0.2]: See per-module changelogs above
 [1.0.1]: https://github.com/howtis/python-embed/releases/tag/v1.0.1
 [1.0.0]: https://github.com/howtis/python-embed/releases/tag/v1.0.0
