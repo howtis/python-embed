@@ -20,6 +20,10 @@ plugins {
 pythonEmbed {
     packages = ['numpy']
 }
+
+dependencies {
+    implementation 'io.github.howtis:python-embed-runtime:1.0.2'
+}
 ```
 
 Then use it in your Java code:
