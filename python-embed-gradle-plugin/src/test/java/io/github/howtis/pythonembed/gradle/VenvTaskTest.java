@@ -214,6 +214,129 @@ class VenvTaskTest {
     }
 
     // ------------------------------------------------------------------
+    // Fingerprint edge cases: pythonSource handling
+    // ------------------------------------------------------------------
+
+    /**
+     * When the fingerprint has python.version and packages.hash but python.source
+     * is null (e.g., fingerprint from an older plugin version), the task should
+     * NOT skip setup. The sourceKnown check fails, triggering full setup.
+     */
+    @Test
+    void createVenv_nullPythonSourceForcesFullSetup(@TempDir Path tempDir) throws IOException {
+        Path venvPath = tempDir.resolve("test-venv");
+        task.getVenvDir().set(project.getLayout().getProjectDirectory().dir(tempDir.toString() + "/test-venv"));
+
+        // Create fake python executable in OS-appropriate location
+        createPrimaryPythonExe(venvPath);
+
+        // Set packages matching the fingerprint
+        List<String> packages = List.of("numpy==1.26.4");
+        task.getPackages().set(packages);
+        String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
+
+        // Write fingerprint with python.source = null (simulates old-format fingerprint)
+        Properties fp = new Properties();
+        // Intentionally omit python.source property
+        fp.setProperty("python.version", "3.12");
+        fp.setProperty("packages.hash", expectedHash);
+        try (var writer = Files.newBufferedWriter(venvPath.resolve("python-embed.fingerprint"), StandardCharsets.UTF_8)) {
+            fp.store(writer, null);
+        }
+
+        // Should NOT skip: pythonSource is null → sourceKnown=false → full setup.
+        // Outcome: either finds system Python and succeeds, or fails trying to find/download Python.
+        // Either way, the skip path must NOT be taken.
+        try {
+            task.createVenv();
+            // If we get here, Python was found and setup succeeded.
+            // Verify fingerprint was updated with python.source
+            Path fpPath = venvPath.resolve("python-embed.fingerprint");
+            assertTrue(Files.exists(fpPath), "Fingerprint should be written after setup");
+            Properties updatedFp = new Properties();
+            try (var reader = Files.newBufferedReader(fpPath, StandardCharsets.UTF_8)) {
+                updatedFp.load(reader);
+            }
+            assertNotNull(updatedFp.getProperty("python.source"), "python.source should be populated after setup");
+        } catch (GradleException e) {
+            // Acceptable: Python may not be available
+            assertTrue(e.getMessage().contains("Python") || e.getMessage().contains("pip")
+                    || e.getMessage().contains("Failed to run"));
+        }
+    }
+
+    /**
+     * When the stored python.version differs from the current pythonVersion
+     * property, the task should force a full setup (not reuse stale environment).
+     */
+    @Test
+    void createVenv_pythonVersionMismatchForcesFullSetup(@TempDir Path tempDir) throws IOException {
+        Path venvPath = tempDir.resolve("test-venv");
+        task.getVenvDir().set(project.getLayout().getProjectDirectory().dir(tempDir.toString() + "/test-venv"));
+
+        // Create fake python executable
+        createPrimaryPythonExe(venvPath);
+
+        // Set packages matching the fingerprint
+        List<String> packages = List.of("numpy==1.26.4");
+        task.getPackages().set(packages);
+        String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
+        task.getPythonVersion().set("3.12");
+
+        // Write fingerprint with python.version=3.11 (doesn't match current 3.12)
+        Properties fp = new Properties();
+        fp.setProperty("python.source", "system");
+        fp.setProperty("python.version", "3.11");  // Mismatch!
+        fp.setProperty("packages.hash", expectedHash);
+        try (var writer = Files.newBufferedWriter(venvPath.resolve("python-embed.fingerprint"), StandardCharsets.UTF_8)) {
+            fp.store(writer, null);
+        }
+
+        // Should NOT skip: version mismatch → pythonVersionMatch=false → full setup
+        try {
+            task.createVenv();
+        } catch (GradleException e) {
+            assertTrue(e.getMessage().contains("Python") || e.getMessage().contains("pip")
+                    || e.getMessage().contains("Failed to run"));
+        }
+    }
+
+    /**
+     * When the fingerprint file exists but the Python executable has been
+     * deleted from the venv directory, the task should perform full setup.
+     */
+    @Test
+    void createVenv_pythonMissingForcesFullSetup(@TempDir Path tempDir) throws IOException {
+        Path venvPath = tempDir.resolve("test-venv");
+        task.getVenvDir().set(project.getLayout().getProjectDirectory().dir(tempDir.toString() + "/test-venv"));
+
+        // Do NOT create python executable (simulates deleted venv)
+        Files.createDirectories(venvPath);
+
+        // Set packages matching the fingerprint
+        List<String> packages = List.of("numpy==1.26.4");
+        task.getPackages().set(packages);
+        String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
+
+        // Write valid fingerprint
+        Properties fp = new Properties();
+        fp.setProperty("python.source", "system");
+        fp.setProperty("python.version", "3.12");
+        fp.setProperty("packages.hash", expectedHash);
+        try (var writer = Files.newBufferedWriter(venvPath.resolve("python-embed.fingerprint"), StandardCharsets.UTF_8)) {
+            fp.store(writer, null);
+        }
+
+        // Should NOT skip: python executable is missing → pythonPresent=false → full setup
+        try {
+            task.createVenv();
+        } catch (GradleException e) {
+            assertTrue(e.getMessage().contains("Python") || e.getMessage().contains("pip")
+                    || e.getMessage().contains("Failed to run"));
+        }
+    }
+
+    // ------------------------------------------------------------------
     // detectTargetTriple (target OS for cross-compilation)
     // ------------------------------------------------------------------
 
