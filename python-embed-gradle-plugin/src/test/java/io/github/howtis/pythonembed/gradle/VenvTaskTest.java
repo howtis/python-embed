@@ -149,8 +149,8 @@ class VenvTaskTest {
         // Create fake python executable in OS-appropriate location
         createPrimaryPythonExe(venvPath);
 
-        // Set packages and compute expected fingerprint
-        // msgpack is auto-added by VenvTask, so include it in the expected hash
+        // Set packages and compute expected fingerprint.
+        // includeMsgpack defaults to true in VenvConfig, so msgpack is auto-added.
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
         String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
@@ -231,7 +231,8 @@ class VenvTaskTest {
         // Create fake python executable in OS-appropriate location
         createPrimaryPythonExe(venvPath);
 
-        // Set packages matching the fingerprint
+        // Set packages matching the fingerprint.
+        // includeMsgpack defaults to true in VenvConfig, so msgpack is auto-added.
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
         String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
@@ -278,7 +279,8 @@ class VenvTaskTest {
         // Create fake python executable
         createPrimaryPythonExe(venvPath);
 
-        // Set packages matching the fingerprint
+        // Set packages matching the fingerprint.
+        // includeMsgpack defaults to true in VenvConfig, so msgpack is auto-added.
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
         String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);
@@ -314,7 +316,8 @@ class VenvTaskTest {
         // Do NOT create python executable (simulates deleted venv)
         Files.createDirectories(venvPath);
 
-        // Set packages matching the fingerprint
+        // Set packages matching the fingerprint.
+        // includeMsgpack defaults to true in VenvConfig, so msgpack is auto-added.
         List<String> packages = List.of("numpy==1.26.4");
         task.getPackages().set(packages);
         String expectedHash = task.computePackageHash(List.of("numpy==1.26.4", "msgpack"), null, List.of(), null);

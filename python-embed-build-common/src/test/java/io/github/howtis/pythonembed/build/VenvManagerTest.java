@@ -66,8 +66,7 @@ class VenvManagerTest {
         Files.createFile(pythonExe);
 
         // Write a fingerprint matching the expected configuration.
-        // VenvManager.setup() always adds "msgpack" to the packages list,
-        // so the fingerprint must include it.
+        // includeMsgpack defaults to true, so msgpack is added to the packages list.
         String pythonVersion = "3.12";
         String packageHash = FingerprintManager.computePackageHash(
                 List.of("msgpack"), null, List.of(), null);
@@ -75,6 +74,39 @@ class VenvManagerTest {
 
         VenvConfig config = VenvConfig.builder()
                 .venvDir(venvDir)
+                .build();
+
+        PythonEnvironment result = VenvManager.setup(config);
+
+        assertNotNull(result);
+        assertEquals(venvDir, result.venvDir());
+        assertEquals("system", result.source());
+    }
+
+    @Test
+    void setup_upToDate_withoutMsgpack(@TempDir Path tempDir) throws IOException {
+        Path venvDir = tempDir.resolve("venv");
+        Files.createDirectories(venvDir);
+
+        // Create a mock Python executable
+        Path pythonExe;
+        if (PythonResolver.isWindows()) {
+            pythonExe = venvDir.resolve("python.exe");
+        } else {
+            pythonExe = venvDir.resolve("bin").resolve("python3");
+            Files.createDirectories(pythonExe.getParent());
+        }
+        Files.createFile(pythonExe);
+
+        // Write a fingerprint matching empty packages (msgpack excluded).
+        String pythonVersion = "3.12";
+        String packageHash = FingerprintManager.computePackageHash(
+                List.of(), null, List.of(), null);
+        FingerprintManager.write(venvDir, "system", pythonVersion, packageHash);
+
+        VenvConfig config = VenvConfig.builder()
+                .venvDir(venvDir)
+                .includeMsgpack(false)
                 .build();
 
         PythonEnvironment result = VenvManager.setup(config);

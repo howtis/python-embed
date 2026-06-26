@@ -1,5 +1,6 @@
 rootProject.name = 'python-embed'
 
+includeBuild 'python-embed-build-common'
 includeBuild 'python-embed-gradle-plugin'
 includeBuild 'python-embed-maven-plugin'
 include 'python-embed-runtime'

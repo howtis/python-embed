@@ -36,7 +36,10 @@ public final class VenvManager {
 
         // Collect packages
         List<String> packages = new ArrayList<>(config.packages());
-        if (!packages.contains("msgpack")) {
+
+        // Include msgpack by default (required by python-embed-runtime bridge protocol).
+        // Users who do not need the runtime can opt out via VenvConfig.includeMsgpack(false).
+        if (config.includeMsgpack() && !packages.contains("msgpack")) {
             packages.add("msgpack");
         }
 

@@ -22,6 +22,7 @@ public final class VenvConfig {
     private final Path venvDir;
     private final String targetOs;
     private final Consumer<String> logger;
+    private final boolean includeMsgpack;
 
     private VenvConfig(Builder builder) {
         this.packages = Collections.unmodifiableList(new ArrayList<>(builder.packages));
@@ -33,6 +34,7 @@ public final class VenvConfig {
         this.venvDir = Objects.requireNonNull(builder.venvDir, "venvDir must not be null");
         this.targetOs = builder.targetOs;
         this.logger = builder.logger;
+        this.includeMsgpack = builder.includeMsgpack;
     }
 
     public List<String> packages() { return packages; }
@@ -44,6 +46,15 @@ public final class VenvConfig {
     public Path venvDir() { return venvDir; }
     public String targetOs() { return targetOs; }
     public Consumer<String> logger() { return logger; }
+
+    /**
+     * Whether to include {@code msgpack} in the installed packages.
+     * Defaults to {@code true} because {@code msgpack} is required by
+     * {@code python-embed-runtime}'s bridge protocol.
+     *
+     * @return true if msgpack should be included
+     */
+    public boolean includeMsgpack() { return includeMsgpack; }
 
     public static Builder builder() {
         return new Builder();
@@ -59,6 +70,7 @@ public final class VenvConfig {
         private Path venvDir;
         private String targetOs;
         private Consumer<String> logger = s -> {};
+        private boolean includeMsgpack = true;
 
         private Builder() {}
 
@@ -104,6 +116,11 @@ public final class VenvConfig {
 
         public Builder logger(Consumer<String> logger) {
             this.logger = Objects.requireNonNull(logger, "logger must not be null");
+            return this;
+        }
+
+        public Builder includeMsgpack(boolean includeMsgpack) {
+            this.includeMsgpack = includeMsgpack;
             return this;
         }
 
