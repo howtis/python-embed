@@ -107,6 +107,29 @@ class PythonEmbedIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void eval_codeExceedingMaxLength_throws() {
+        PythonEmbed.Options strictOpts = PythonEmbed.Options.builder()
+                .timeoutMs(60_000)
+                .maxCodeLength(5)
+                .startupTimeoutMs(30_000)
+                .venvPath(Path.of("build", "python-venv"))
+                .build();
+        try (PythonEmbed strictPy = PythonEmbed.create(strictOpts)) {
+            // Code is 7 chars (> 5) but the frame is well under 50 bytes
+            String longCode = "1+2+3+4";
+            PythonExecutionException ex = assertThrows(
+                    PythonExecutionException.class,
+                    () -> strictPy.eval(longCode)
+            );
+            assertTrue(
+                    ex.getMessage().contains("maximum length")
+                            || ex.getMessage().contains("exceeds"),
+                    "Expected max code length error, got: " + ex.getMessage());
+        }
+    }
+
+    @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void exec_multiline_functionDef() {
         py.exec("""

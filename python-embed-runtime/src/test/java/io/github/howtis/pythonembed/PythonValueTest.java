@@ -268,4 +268,80 @@ class PythonValueTest {
         assertThrows(ClassCastException.class, v::asIntMap);
         assertThrows(ClassCastException.class, v::asLongMap);
     }
+
+    // ---- null value safety ----
+
+    @Test
+    void isNull_returnsTrue_whenRawIsNull() {
+        PythonValue v = PythonValue.of(null);
+        assertTrue(v.isNull());
+        assertNull(v.raw());
+    }
+
+    @Test
+    void asInt_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertTrue(v.isNull());
+        assertThrows(IllegalStateException.class, v::asInt);
+    }
+
+    @Test
+    void asLong_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asLong);
+    }
+
+    @Test
+    void asDouble_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asDouble);
+    }
+
+    @Test
+    void asBoolean_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asBoolean);
+    }
+
+    @Test
+    void asString_onNull_returnsNullLiteral() {
+        PythonValue v = PythonValue.of(null);
+        assertEquals("null", v.asString());
+    }
+
+    @Test
+    void asList_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, () -> v.asList(Integer.class));
+    }
+
+    @Test
+    void asList_noArg_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asList);
+    }
+
+    @Test
+    void asMap_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, () -> v.asMap(String.class, Double.class));
+    }
+
+    @Test
+    void asMap_noArg_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asMap);
+    }
+
+    @Test
+    void asBytes_onNull_throwsIllegalStateException() {
+        PythonValue v = PythonValue.of(null);
+        assertThrows(IllegalStateException.class, v::asBytes);
+    }
+
+    @Test
+    void toString_onNull_showsNull() {
+        PythonValue v = PythonValue.of(null);
+        assertEquals("PythonValue{null}", v.toString());
+    }
 }

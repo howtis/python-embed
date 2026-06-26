@@ -187,6 +187,53 @@ class PythonEmbedPoolTest {
     }
 
     // ------------------------------------------------------------------
+    // Pool exhaustion (CallerRunsPolicy backpressure)
+    // ------------------------------------------------------------------
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void exhaustion_tasksCompleteWithoutRejection() throws Exception {
+        PythonEmbedPool smallPool = PythonEmbedPool.builder().minPool(1).maxPool(1).build();
+        try {
+            // Submit more tasks than maxPool (1). CallerRunsPolicy ensures
+            // no RejectedExecutionException -- all tasks complete.
+            int taskCount = 5;
+            @SuppressWarnings("unchecked")
+            CompletableFuture<PythonValue>[] futures = new CompletableFuture[taskCount];
+            for (int i = 0; i < taskCount; i++) {
+                futures[i] = smallPool.eval(String.valueOf(i * 10));
+            }
+            for (int i = 0; i < taskCount; i++) {
+                assertEquals(i * 10, futures[i].get(5, TimeUnit.SECONDS).asInt());
+            }
+        } finally {
+            smallPool.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void exhaustion_longRunningTasks_stillComplete() throws Exception {
+        PythonEmbedPool smallPool = PythonEmbedPool.builder().minPool(1).maxPool(2).build();
+        try {
+            // Saturate with two long-ish tasks. The third task exercises
+            // CallerRunsPolicy: it runs on the caller thread once executor
+            // threads and semaphore permits are all taken.
+            CompletableFuture<PythonValue> slow1 = smallPool.eval("__import__('time').sleep(1) or 1");
+            CompletableFuture<PythonValue> slow2 = smallPool.eval("__import__('time').sleep(1) or 2");
+
+            // Submit one more -- CallerRunsPolicy will eventually handle it
+            CompletableFuture<PythonValue> extra = smallPool.eval("42");
+
+            assertEquals(1, slow1.get(10, TimeUnit.SECONDS).asInt());
+            assertEquals(2, slow2.get(10, TimeUnit.SECONDS).asInt());
+            assertEquals(42, extra.get(10, TimeUnit.SECONDS).asInt());
+        } finally {
+            smallPool.close();
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Stream
     // ------------------------------------------------------------------
 
@@ -582,6 +629,34 @@ class PythonEmbedPoolTest {
     @Test
     void maxPool_mustBeAtLeastMinPool() {
         assertThrows(IllegalArgumentException.class, () -> PythonEmbedPool.builder().minPool(3).maxPool(2).build());
+    }
+
+    // ------------------------------------------------------------------
+    // Options.Builder validation
+    // ------------------------------------------------------------------
+
+    @Test
+    void options_timeoutMs_mustBePositive() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().timeoutMs(0).build());
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().timeoutMs(-1).build());
+    }
+
+    @Test
+    void options_maxCodeLength_mustBePositive() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().maxCodeLength(0).build());
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().maxCodeLength(-1).build());
+    }
+
+    @Test
+    void options_startupTimeoutMs_mustBePositive() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().startupTimeoutMs(0).build());
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().startupTimeoutMs(-1).build());
     }
 
     // ------------------------------------------------------------------

@@ -1375,7 +1375,23 @@ public class PythonEmbed implements AutoCloseable {
                 return this;
             }
 
+            /**
+             * Builds an {@link Options} instance from the builder's current values.
+             *
+             * @return a new {@link Options} instance
+             * @throws IllegalArgumentException if {@code timeoutMs <= 0},
+             *         {@code maxCodeLength <= 0}, or {@code startupTimeoutMs <= 0}
+             */
             public Options build() {
+                if (timeoutMs <= 0) {
+                    throw new IllegalArgumentException("timeoutMs must be positive");
+                }
+                if (maxCodeLength <= 0) {
+                    throw new IllegalArgumentException("maxCodeLength must be positive");
+                }
+                if (startupTimeoutMs <= 0) {
+                    throw new IllegalArgumentException("startupTimeoutMs must be positive");
+                }
                 return new Options(timeoutMs,
                         maxCodeLength, startupTimeoutMs, pythonExecutable,
                         List.copyOf(warmupScripts), lenientWarmup,
