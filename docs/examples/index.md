@@ -1,6 +1,6 @@
 # Examples
 
-13 working examples demonstrating PythonEmbed features. Each example is a standalone Gradle subproject you can run directly.
+13 working examples demonstrating PythonEmbed features. Each example is a standalone subproject you can run directly.
 
 ## Running Examples
 
@@ -24,6 +24,7 @@ Or run all examples at once (CI):
 | [Configuration](configuration.md) | `PythonEmbed.Options` builder, env vars, warmup |
 | [Error Handling](error-handling.md) | `PythonExecutionException`, traceback, cause codes |
 | [Health Monitor](health-monitor.md) | `ping()`, `health()`, pool monitoring |
+| [Maven Example](maven-example.md) | Maven plugin setup, basic eval, numpy |
 | [Numpy Basic](numpy-basic.md) | NumPy arrays, operations, broadcasting |
 | [Object Handle](object-handle.md) | `ref()`, handle lifecycle, cross-call references |
 | [Pandas Dataframe](pandas-dataframe.md) | DataFrame creation, compute, pass to Java |

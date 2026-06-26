@@ -2,23 +2,59 @@
 
 Get PythonEmbed running in your project in 5 minutes.
 
-## 1. Add the Gradle Plugin
+## 1. Add the Build Plugin
 
-Add to `build.gradle`:
+=== "Gradle"
 
-```groovy
-plugins {
-    id 'io.github.howtis.python-embed' version '1.0.2'
-}
+    Add to `build.gradle`:
 
-dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.2'
-}
+    ```groovy
+    plugins {
+        id 'io.github.howtis.python-embed' version '1.0.2'
+    }
 
-pythonEmbed {
-    packages = ['numpy']
-}
-```
+    dependencies {
+        implementation 'io.github.howtis:python-embed-runtime:1.0.2'
+    }
+
+    pythonEmbed {
+        packages = ['numpy']
+    }
+    ```
+
+=== "Maven"
+
+    Add to `pom.xml`:
+
+    ```xml
+    <dependencies>
+        <dependency>
+            <groupId>io.github.howtis</groupId>
+            <artifactId>python-embed-runtime</artifactId>
+            <version>1.0.2</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.github.howtis</groupId>
+                <artifactId>python-embed-maven-plugin</artifactId>
+                <version>1.0.2</version>
+                <executions>
+                    <execution>
+                        <goals><goal>setup</goal></goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <packages>
+                        <package>numpy</package>
+                    </packages>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    ```
 
 The plugin automatically downloads Python (if needed), creates a venv, and installs packages at build time.
 

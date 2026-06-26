@@ -38,6 +38,7 @@ nav:
       - Configuration: examples/configuration.md
       - Error Handling: examples/error-handling.md
       - Health Monitor: examples/health-monitor.md
+      - Maven Example: examples/maven-example.md
       - Numpy Basic: examples/numpy-basic.md
       - Object Handle: examples/object-handle.md
       - Pandas Dataframe: examples/pandas-dataframe.md

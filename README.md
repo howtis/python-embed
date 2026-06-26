@@ -12,21 +12,57 @@ PythonEmbed embeds a real CPython interpreter in your JVM application via a subp
 
 ## Quick Start
 
-Add the Gradle plugin to `build.gradle`:
+=== "Gradle"
 
-```groovy
-plugins {
-    id 'io.github.howtis.python-embed' version '1.0.2'
-}
+    Add the Gradle plugin to `build.gradle`:
 
-pythonEmbed {
-    packages = ['numpy']
-}
+    ```groovy
+    plugins {
+        id 'io.github.howtis.python-embed' version '1.0.2'
+    }
 
-dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.2'
-}
-```
+    pythonEmbed {
+        packages = ['numpy']
+    }
+
+    dependencies {
+        implementation 'io.github.howtis:python-embed-runtime:1.0.2'
+    }
+    ```
+
+=== "Maven"
+
+    Add the Maven plugin to `pom.xml`:
+
+    ```xml
+    <dependencies>
+        <dependency>
+            <groupId>io.github.howtis</groupId>
+            <artifactId>python-embed-runtime</artifactId>
+            <version>1.0.2</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.github.howtis</groupId>
+                <artifactId>python-embed-maven-plugin</artifactId>
+                <version>1.0.2</version>
+                <executions>
+                    <execution>
+                        <goals><goal>setup</goal></goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <packages>
+                        <package>numpy</package>
+                    </packages>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    ```
 
 Then use it in your Java code:
 
@@ -38,7 +74,7 @@ try (PythonEmbed py = PythonEmbed.create()) {
 }
 ```
 
-The Gradle plugin handles Python installation, venv creation, and package installation at build time.
+The build plugin handles Python installation, venv creation, and package installation at build time.
 
 ## Key Features
 
@@ -58,6 +94,7 @@ The Gradle plugin handles Python installation, venv creation, and package instal
 ## Modules
 
 - **[python-embed-gradle-plugin](python-embed-gradle-plugin/)** — venv creation, package installation, Python auto-download
+- **[python-embed-maven-plugin](python-embed-maven-plugin/)** — Maven equivalent of the Gradle plugin
 - **[python-embed-runtime](python-embed-runtime/)** — process communication, pool management, type conversion
 - **[python-embed-spring-boot-starter](python-embed-spring-boot-starter/)** — Spring Boot 3.x auto-configuration (SINGLE/POOL modes)
 - **[python-embed-examples](python-embed-examples/)** — 13 real-world examples
