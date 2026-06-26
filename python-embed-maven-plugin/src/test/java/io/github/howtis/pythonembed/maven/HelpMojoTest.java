@@ -83,8 +83,8 @@ class HelpMojoTest {
 
         mojo.execute();
 
-        assertTrue(log.containsInfo("Goal: nonexistent"),
-                "Should still show goal header even for unknown goal");
+        assertTrue(log.containsInfo("No goal: nonexistent"),
+                "Should report unknown goal");
     }
 
 }

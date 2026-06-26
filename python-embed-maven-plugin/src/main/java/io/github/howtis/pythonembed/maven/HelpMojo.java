@@ -4,9 +4,16 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.InputStream;
 
 /**
  * Display help information on python-embed-maven-plugin.
+ * Reads the plugin descriptor ({@code META-INF/maven/plugin.xml}) at runtime.
  *
  * <pre>{@code
  * mvn python-embed:help -Ddetail=true -Dgoal=setup
@@ -39,88 +46,83 @@ public class HelpMojo extends AbstractMojo {
     @Parameter(property = "lineLength", defaultValue = "80")
     private int lineLength;
 
-    private static final String HELP_TEXT = """
-            python-embed-maven-plugin %s
-
-            This plugin creates a Python virtual environment (venv) and installs
-            specified packages at build time. If system Python is not available,
-            a portable CPython is automatically downloaded from python-build-standalone.
-
-            Goals:
-
-              setup       Creates a Python venv and installs packages.
-                          Default phase: generate-resources
-                          Usage: mvn python-embed:setup
-
-              properties  Generates META-INF/python-embed.properties for runtime discovery.
-                          Default phase: generate-resources
-                          Usage: mvn python-embed:properties
-
-              help        Display this help message.
-                          Usage: mvn python-embed:help [-Ddetail=true] [-Dgoal=<goal>]
-
-            Configuration (setup goal):
-
-              packages           List of pip packages to install
-              pythonVersion      Python version for auto-download (default: 3.12)
-              venvOutputDir      Venv output directory (default: ${project.build.directory}/python-venv)
-              requirementsFile   Path to requirements.txt
-              pyprojectTomlFile  Path to pyproject.toml
-              pipIndexUrl        Custom pip index URL
-              pipExtraArgs       Extra pip install arguments
-              skip               Skip plugin execution (default: false)
-              targetOs           Target OS: windows, linux, macos (null = auto-detect)
-
-            For more information, visit: https://github.com/howtis/python-embed
-            """;
+    private static final String DESCRIPTOR = "META-INF/maven/plugin.xml";
 
     @Override
     public void execute() throws MojoExecutionException {
-        String version = getClass().getPackage().getImplementationVersion();
-        if (version == null) {
-            version = "1.0.2";
-        }
+        try (InputStream in = getClass().getClassLoader()
+                .getResourceAsStream(DESCRIPTOR)) {
+            if (in == null) {
+                getLog().warn("Plugin descriptor not found: " + DESCRIPTOR);
+                return;
+            }
+            Document doc = DocumentBuilderFactory.newInstance()
+                    .newDocumentBuilder().parse(in);
+            Element root = doc.getDocumentElement();
 
-        if (detail) {
-            String targetGoal = (goal != null && !goal.isEmpty()) ? goal : "setup";
-            getLog().info(buildDetailHelp(version, targetGoal));
-        } else {
-            getLog().info(String.format(HELP_TEXT, version));
+            StringBuilder sb = new StringBuilder();
+            sb.append(text(root, "name")).append(' ')
+                    .append(text(root, "version")).append('\n')
+                    .append(text(root, "description")).append("\n\n");
+
+            NodeList mojos = root.getElementsByTagName("mojo");
+            if (detail) {
+                boolean found = false;
+                for (int i = 0; i < mojos.getLength(); i++) {
+                    Element m = (Element) mojos.item(i);
+                    String g = text(m, "goal");
+                    if (goal != null && !goal.isEmpty() && !g.equals(goal)) {
+                        continue;
+                    }
+                    found = true;
+                    sb.append("Goal: ").append(g).append('\n')
+                            .append(text(m, "description")).append("\n\n")
+                            .append("Parameters:\n\n");
+                    NodeList params = m.getElementsByTagName("parameter");
+                    for (int j = 0; j < params.getLength(); j++) {
+                        Element p = (Element) params.item(j);
+                        if ("false".equals(text(p, "editable"))) {
+                            continue;
+                        }
+                        String type = simpleName(text(p, "type"));
+                        sb.append(indent(text(p, "name"),
+                                type + " - " + text(p, "description")));
+                    }
+                }
+                if (!found) {
+                    sb.append("No goal: ").append(goal).append('\n');
+                }
+            } else {
+                sb.append("Goals:\n\n");
+                for (int i = 0; i < mojos.getLength(); i++) {
+                    Element m = (Element) mojos.item(i);
+                    sb.append(indent(text(m, "goal"),
+                            text(m, "description")));
+                }
+                sb.append("Use -Ddetail=true -Dgoal=<goal> for parameters.\n");
+            }
+
+            getLog().info(sb.toString());
+        } catch (Exception e) {
+            throw new MojoExecutionException("Failed to generate help", e);
         }
     }
 
-    private String buildDetailHelp(String version, String goal) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("python-embed-maven-plugin ").append(version).append("\n");
-        sb.append("\n");
-        sb.append("Goal: ").append(goal).append("\n");
-        sb.append("=".repeat(Math.min(sb.length(), lineLength)));
-        sb.append("\n\n");
-
-        if ("setup".equals(goal)) {
-            sb.append(indent("packages", "List of pip packages to install (String[])", indentSize));
-            sb.append(indent("pythonVersion", "Python version for auto-download (default: 3.12)", indentSize));
-            sb.append(indent("venvOutputDir", "Venv output directory (default: ${project.build.directory}/python-venv)", indentSize));
-            sb.append(indent("requirementsFile", "Path to requirements.txt", indentSize));
-            sb.append(indent("pyprojectTomlFile", "Path to pyproject.toml", indentSize));
-            sb.append(indent("pipIndexUrl", "Custom pip index URL", indentSize));
-            sb.append(indent("pipExtraArgs", "Extra pip install arguments (String[])", indentSize));
-            sb.append(indent("skip", "Skip plugin execution (default: false)", indentSize));
-            sb.append(indent("targetOs", "Target OS: windows, linux, macos (auto-detect if not set)", indentSize));
-        } else if ("properties".equals(goal)) {
-            sb.append(indent("venvOutputDir", "Venv output directory (default: ${project.build.directory}/python-venv)", indentSize));
-            sb.append(indent("skip", "Skip plugin execution (default: false)", indentSize));
-        } else if ("help".equals(goal)) {
-            sb.append(indent("detail", "Display all settable properties (default: false)", indentSize));
-            sb.append(indent("goal", "Goal name to show detailed help for", indentSize));
-            sb.append(indent("indentSize", "Indentation size (default: 2)", indentSize));
-            sb.append(indent("lineLength", "Maximum line length (default: 80)", indentSize));
-        }
-
-        return sb.toString();
+    private String indent(String name, String desc) {
+        return " ".repeat(indentSize) + name + '\n'
+                + " ".repeat(indentSize * 2) + desc + "\n\n";
     }
 
-    private static String indent(String name, String description, int size) {
-        return " ".repeat(size) + name + "\n" + " ".repeat(size * 2) + description + "\n\n";
+    private static String text(Element parent, String tag) {
+        NodeList list = parent.getElementsByTagName(tag);
+        return list.getLength() > 0 ? list.item(0).getTextContent() : "";
+    }
+
+    private static String simpleName(String type) {
+        if (type == null || type.isEmpty()) {
+            return type;
+        }
+        int dot = type.lastIndexOf('.');
+        return dot >= 0 ? type.substring(dot + 1) : type;
     }
 }
