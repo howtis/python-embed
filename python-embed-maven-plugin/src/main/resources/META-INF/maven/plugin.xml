@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <name>python-embed-maven-plugin</name>
+  <description>Maven plugin to create Python venv, install packages, and auto-download CPython for JVM embedding</description>
+  <groupId>io.github.howtis</groupId>
+  <artifactId>python-embed-maven-plugin</artifactId>
+  <version>${version}</version>
+  <goalPrefix>python-embed</goalPrefix>
+  <isolatedRealm>false</isolatedRealm>
+  <inheritedByDefault>true</inheritedByDefault>
+  <mojos>
+    <mojo>
+      <goal>setup</goal>
+      <description>Creates a Python virtual environment (venv) and installs specified packages.</description>
+      <requiresDependencyResolution>compile+runtime</requiresDependencyResolution>
+      <requiresDirectInvocation>false</requiresDirectInvocation>
+      <requiresProject>true</requiresProject>
+      <requiresReports>false</requiresReports>
+      <aggregator>false</aggregator>
+      <requiresOnline>false</requiresOnline>
+      <inheritedByDefault>true</inheritedByDefault>
+      <implementation>io.github.howtis.pythonembed.maven.SetupMojo</implementation>
+      <language>java</language>
+      <instantiationStrategy>per-lookup</instantiationStrategy>
+      <executionStrategy>once-per-session</executionStrategy>
+      <threadSafe>true</threadSafe>
+      <parameters>
+        <parameter>
+          <name>packages</name>
+          <type>java.util.List</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>List of pip packages to install.</description>
+        </parameter>
+        <parameter>
+          <name>pythonVersion</name>
+          <type>java.lang.String</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Python version to download when system Python is not available.</description>
+        </parameter>
+        <parameter>
+          <name>venvOutputDir</name>
+          <type>java.io.File</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Path to the venv output directory.</description>
+        </parameter>
+        <parameter>
+          <name>requirementsFile</name>
+          <type>java.io.File</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Optional path to requirements.txt.</description>
+        </parameter>
+        <parameter>
+          <name>pyprojectTomlFile</name>
+          <type>java.io.File</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Optional path to pyproject.toml.</description>
+        </parameter>
+        <parameter>
+          <name>pipIndexUrl</name>
+          <type>java.lang.String</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Optional pip index URL (e.g., PyTorch CUDA index).</description>
+        </parameter>
+        <parameter>
+          <name>pipExtraArgs</name>
+          <type>java.util.List</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Optional extra pip install arguments.</description>
+        </parameter>
+        <parameter>
+          <name>skip</name>
+          <type>boolean</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Skip the plugin execution entirely.</description>
+        </parameter>
+        <parameter>
+          <name>targetOs</name>
+          <type>java.lang.String</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Target OS for cross-compilation: "windows", "linux", "macos" (null = auto-detect).</description>
+        </parameter>
+        <parameter>
+          <name>project</name>
+          <type>org.apache.maven.project.MavenProject</type>
+          <required>true</required>
+          <readonly>true</readonly>
+          <editable>false</editable>
+          <description>The Maven project (auto-injected).</description>
+        </parameter>
+        <parameter>
+          <name>session</name>
+          <type>org.apache.maven.execution.MavenSession</type>
+          <required>true</required>
+          <readonly>true</readonly>
+          <editable>false</editable>
+          <description>The Maven session (auto-injected).</description>
+        </parameter>
+      </parameters>
+    </mojo>
+    <mojo>
+      <goal>properties</goal>
+      <description>Generates META-INF/python-embed.properties for runtime discovery of the Python environment path.</description>
+      <requiresDependencyResolution>compile+runtime</requiresDependencyResolution>
+      <requiresDirectInvocation>false</requiresDirectInvocation>
+      <requiresProject>true</requiresProject>
+      <requiresReports>false</requiresReports>
+      <aggregator>false</aggregator>
+      <requiresOnline>false</requiresOnline>
+      <inheritedByDefault>true</inheritedByDefault>
+      <implementation>io.github.howtis.pythonembed.maven.PropertiesMojo</implementation>
+      <language>java</language>
+      <instantiationStrategy>per-lookup</instantiationStrategy>
+      <executionStrategy>once-per-session</executionStrategy>
+      <threadSafe>true</threadSafe>
+      <executePhase>generate-resources</executePhase>
+      <executeGoal>setup</executeGoal>
+      <parameters>
+        <parameter>
+          <name>venvOutputDir</name>
+          <type>java.io.File</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Path to the venv output directory.</description>
+        </parameter>
+        <parameter>
+          <name>project</name>
+          <type>org.apache.maven.project.MavenProject</type>
+          <required>true</required>
+          <readonly>true</readonly>
+          <editable>false</editable>
+          <description>The Maven project (auto-injected).</description>
+        </parameter>
+        <parameter>
+          <name>skip</name>
+          <type>boolean</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>Skip the properties generation.</description>
+        </parameter>
+      </parameters>
+    </mojo>
+    <mojo>
+      <goal>help</goal>
+      <description>Display help information on python-embed-maven-plugin.</description>
+      <requiresDirectInvocation>false</requiresDirectInvocation>
+      <requiresProject>false</requiresProject>
+      <requiresReports>false</requiresReports>
+      <aggregator>false</aggregator>
+      <requiresOnline>false</requiresOnline>
+      <inheritedByDefault>true</inheritedByDefault>
+      <implementation>io.github.howtis.pythonembed.maven.HelpMojo</implementation>
+      <language>java</language>
+      <instantiationStrategy>per-lookup</instantiationStrategy>
+      <executionStrategy>once-per-session</executionStrategy>
+      <threadSafe>true</threadSafe>
+      <parameters>
+        <parameter>
+          <name>detail</name>
+          <type>boolean</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>If true, display all settable properties for each mojo.</description>
+        </parameter>
+        <parameter>
+          <name>goal</name>
+          <type>java.lang.String</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>The name of the mojo for which to show help.</description>
+        </parameter>
+        <parameter>
+          <name>indentSize</name>
+          <type>int</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>The number of spaces per indentation level.</description>
+        </parameter>
+        <parameter>
+          <name>lineLength</name>
+          <type>int</type>
+          <required>false</required>
+          <editable>true</editable>
+          <description>The maximum line length for display.</description>
+        </parameter>
+      </parameters>
+    </mojo>
+  </mojos>
+</plugin>

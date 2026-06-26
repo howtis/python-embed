@@ -1,11 +1,11 @@
-package io.github.howtis.pythonembed.gradle;
+package io.github.howtis.pythonembed.build;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 
 /**
  * Parses Python requirements.txt files into a list of package specifications.
@@ -15,8 +15,6 @@ import java.util.logging.Logger;
  * are skipped with a warning.
  */
 public final class RequirementsParser {
-
-    private static final Logger logger = Logger.getLogger(RequirementsParser.class.getName());
 
     private RequirementsParser() {
     }
@@ -29,25 +27,34 @@ public final class RequirementsParser {
      * @throws IOException if the file cannot be read
      */
     public static List<String> parse(Path file) throws IOException {
+        return parse(file, s -> {});
+    }
+
+    /**
+     * Parses a requirements.txt file with a custom logger.
+     *
+     * @param file path to the requirements.txt file
+     * @param logger consumer for warning messages
+     * @return list of package specification strings (may be empty)
+     * @throws IOException if the file cannot be read
+     */
+    public static List<String> parse(Path file, Consumer<String> logger) throws IOException {
         List<String> packages = new ArrayList<>();
         List<String> lines = Files.readAllLines(file);
 
         for (String rawLine : lines) {
             String line = rawLine.trim();
 
-            // Skip empty lines
             if (line.isEmpty()) {
                 continue;
             }
 
-            // Skip comment lines
             if (line.startsWith("#")) {
                 continue;
             }
 
-            // Skip pip option lines (-r, -c, --*, etc.)
             if (line.startsWith("-")) {
-                logger.warning("Skipping unsupported pip option: " + line);
+                logger.accept("Skipping unsupported pip option: " + line);
                 continue;
             }
 

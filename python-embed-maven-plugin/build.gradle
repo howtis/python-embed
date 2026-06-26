@@ -1,0 +1,83 @@
+plugins {
+    id 'java'
+    id 'com.vanniktech.maven.publish' version '0.34.0'
+}
+
+group = 'io.github.howtis'
+version = project.findProperty('releaseVersion') ?: '1.0.2'
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(true)
+    signAllPublications()
+    pom {
+        name = 'python-embed-maven-plugin'
+        description = 'Maven plugin to create Python venv, install packages, and auto-download CPython for JVM embedding'
+        url = 'https://github.com/howtis/python-embed'
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
+        }
+        developers {
+            developer {
+                id = 'howtis'
+                name = 'howtis'
+                url = 'https://github.com/howtis'
+            }
+        }
+        scm {
+            url = 'https://github.com/howtis/python-embed'
+            connection = 'scm:git:git://github.com/howtis/python-embed.git'
+            developerConnection = 'scm:git:ssh://github.com/howtis/python-embed.git'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "io.github.howtis:python-embed-build-common:${project.findProperty('releaseVersion') ?: '1.0.2'}"
+    implementation 'org.apache.maven:maven-plugin-api:3.9.9'
+    implementation 'org.apache.maven:maven-core:3.9.9'
+    implementation 'org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.apache.maven:maven-compat:3.9.9'
+    testImplementation 'org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0'
+    testImplementation 'org.mockito:mockito-core:5.15.2'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar') {
+    metaInf {
+        from rootProject.file('../LICENSE')
+    }
+}
+
+processResources {
+    def props = [
+        version: project.version.toString()
+    ]
+    inputs.properties(props)
+    filesMatching('META-INF/maven/plugin.xml') {
+        expand(props)
+    }
+}
+
+test {
+    useJUnitPlatform()
+}

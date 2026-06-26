@@ -1,0 +1,3 @@
+rootProject.name = 'python-embed-maven-plugin'
+
+includeBuild '../python-embed-build-common'

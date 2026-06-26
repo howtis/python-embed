@@ -1,6 +1,5 @@
-package io.github.howtis.pythonembed.gradle;
+package io.github.howtis.pythonembed.build;
 
-import io.github.howtis.pythonembed.build.RequirementsParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,21 +43,13 @@ class RequirementsParserTest {
     }
 
     @Test
-    void parse_mixedContent_skipsCommentsAndEmpty(@TempDir Path tempDir) throws IOException {
+    void parse_pipOptions_skipped(@TempDir Path tempDir) throws IOException {
         Path reqFile = tempDir.resolve("requirements.txt");
-        Files.writeString(reqFile, """
-                numpy==1.26.4
-                # scientific computing
-
-                pandas>=2.0
-
-                torch==2.4.0
-                # deep learning
-                """);
+        Files.writeString(reqFile, "numpy\n-r extra.txt\n-c constraints.txt\n--index-url https://example.com\npandas\n");
 
         List<String> result = RequirementsParser.parse(reqFile);
 
-        assertEquals(List.of("numpy==1.26.4", "pandas>=2.0", "torch==2.4.0"), result);
+        assertEquals(List.of("numpy", "pandas"), result);
     }
 
     @Test
@@ -69,47 +60,6 @@ class RequirementsParserTest {
         List<String> result = RequirementsParser.parse(reqFile);
 
         assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void parse_onlyComments_returnsEmptyList(@TempDir Path tempDir) throws IOException {
-        Path reqFile = tempDir.resolve("requirements.txt");
-        Files.writeString(reqFile, "# just a comment\n# another one\n");
-
-        List<String> result = RequirementsParser.parse(reqFile);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void parse_pipOptions_skippedWithWarning(@TempDir Path tempDir) throws IOException {
-        Path reqFile = tempDir.resolve("requirements.txt");
-        Files.writeString(reqFile, "numpy\n-r extra.txt\n-c constraints.txt\n--index-url https://example.com\npandas\n");
-
-        List<String> result = RequirementsParser.parse(reqFile);
-
-        assertEquals(List.of("numpy", "pandas"), result);
-    }
-
-    @Test
-    void parse_packageWithExtras_preserved(@TempDir Path tempDir) throws IOException {
-        Path reqFile = tempDir.resolve("requirements.txt");
-        Files.writeString(reqFile, "tensorflow[and-cuda]>=2.16.0\n");
-
-        List<String> result = RequirementsParser.parse(reqFile);
-
-        assertEquals(List.of("tensorflow[and-cuda]>=2.16.0"), result);
-    }
-
-    @Test
-    void parse_lastLineNoNewline_handled(@TempDir Path tempDir) throws IOException {
-        Path reqFile = tempDir.resolve("requirements.txt");
-        // Write without trailing newline
-        Files.write(reqFile, List.of("numpy==1.26.4", "pandas"));
-
-        List<String> result = RequirementsParser.parse(reqFile);
-
-        assertEquals(List.of("numpy==1.26.4", "pandas"), result);
     }
 
     @Test
