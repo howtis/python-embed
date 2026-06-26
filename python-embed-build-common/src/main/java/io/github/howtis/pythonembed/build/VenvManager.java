@@ -105,7 +105,7 @@ public final class VenvManager {
                 pythonSource = "bundled";
                 String targetOs = PythonResolver.resolveTargetOs(config.targetOs());
                 Path cacheDir = Path.of(System.getProperty("user.home"),
-                        ".gradle", "python-embed");
+                        ".python-embed");
                 log.accept("System Python not found. Downloading python-build-standalone...");
                 pythonExe = PythonDownloader.download(pythonVersion, targetOs, cacheDir, venvDir, log);
             }

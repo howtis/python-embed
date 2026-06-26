@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    defaults:
-      run:
-        working-directory: python-embed-maven-plugin
     steps:
       - uses: actions/checkout@v4
 
@@ -37,10 +34,10 @@ jobs:
           fi
 
       - name: Build
-        run: ./gradlew build${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}
+        run: ./gradlew :python-embed-maven-plugin:build${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}
 
       - name: Publish to Maven Central
-        run: ./gradlew publishToMavenCentral --no-configuration-cache${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}
+        run: ./gradlew :python-embed-maven-plugin:publishToMavenCentral --no-configuration-cache${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

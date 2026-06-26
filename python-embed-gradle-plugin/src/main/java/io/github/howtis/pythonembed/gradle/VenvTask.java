@@ -90,6 +90,7 @@ public abstract class VenvTask extends DefaultTask {
      *
      * @return optional extra pip install arguments
      */
+    @Optional
     @Input
     public abstract ListProperty<String> getPipExtraArgs();
 

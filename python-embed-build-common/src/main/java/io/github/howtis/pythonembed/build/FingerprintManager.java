@@ -81,7 +81,7 @@ public final class FingerprintManager {
         String pythonSource = props.getProperty(KEY_PYTHON_SOURCE);
         String pythonVersion = props.getProperty(KEY_PYTHON_VERSION);
         String packageHash = props.getProperty(KEY_PACKAGES_HASH);
-        if (pythonVersion == null || packageHash == null) {
+        if (pythonSource == null || pythonVersion == null || packageHash == null) {
             return null;
         }
         return new Fingerprint(pythonSource, pythonVersion, packageHash);

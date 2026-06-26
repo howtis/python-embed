@@ -1,6 +1,7 @@
 package io.github.howtis.pythonembed.build;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -11,9 +12,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class VenvConfigTest {
 
     @Test
-    void builder_minimalConfig_returnsDefaults() {
+    void builder_minimalConfig_returnsDefaults(@TempDir Path tempDir) {
+        Path venvPath = tempDir.resolve("venv");
         VenvConfig config = VenvConfig.builder()
-                .venvDir(Path.of("/tmp/venv"))
+                .venvDir(venvPath)
                 .build();
 
         assertNotNull(config.packages());
@@ -24,16 +26,16 @@ class VenvConfigTest {
         assertNull(config.pipIndexUrl());
         assertNotNull(config.pipExtraArgs());
         assertTrue(config.pipExtraArgs().isEmpty());
-        assertEquals(Path.of("/tmp/venv"), config.venvDir());
+        assertEquals(venvPath, config.venvDir());
         assertNull(config.targetOs());
     }
 
     @Test
-    void builder_fullConfig_setsAllFields() {
+    void builder_fullConfig_setsAllFields(@TempDir Path tempDir) {
         Consumer<String> logger = msg -> {};
         Path requirementsFile = Path.of("requirements.txt");
         Path pyprojectTomlFile = Path.of("pyproject.toml");
-        Path venvDir = Path.of("/tmp/venv");
+        Path venvDir = tempDir.resolve("venv");
 
         VenvConfig config = VenvConfig.builder()
                 .packages(List.of("numpy", "pandas"))
@@ -59,11 +61,11 @@ class VenvConfigTest {
     }
 
     @Test
-    void config_isImmutable_copyDefensive() {
+    void config_isImmutable_copyDefensive(@TempDir Path tempDir) {
         List<String> packages = new java.util.ArrayList<>(List.of("numpy"));
         VenvConfig config = VenvConfig.builder()
                 .packages(packages)
-                .venvDir(Path.of("/tmp/venv"))
+                .venvDir(tempDir.resolve("venv"))
                 .build();
 
         packages.add("pandas");
