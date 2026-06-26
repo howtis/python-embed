@@ -2,7 +2,6 @@ package io.github.howtis.pythonembed.maven;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -125,28 +124,4 @@ class SetupMojoTest {
         field.set(target, value);
     }
 
-    private static class TestLog implements Log {
-        private final StringBuilder info = new StringBuilder();
-
-        boolean containsInfo(String text) {
-            return info.toString().contains(text);
-        }
-
-        @Override public boolean isDebugEnabled() { return false; }
-        @Override public void debug(CharSequence content) {}
-        @Override public void debug(CharSequence content, Throwable error) {}
-        @Override public void debug(Throwable error) {}
-        @Override public void info(CharSequence content) { info.append(content).append('\n'); }
-        @Override public void info(CharSequence content, Throwable t) { info.append(content).append('\n'); }
-        @Override public void info(Throwable t) { info.append(t.getMessage()).append('\n'); }
-        @Override public void warn(CharSequence content) {}
-        @Override public void warn(CharSequence content, Throwable t) {}
-        @Override public void warn(Throwable t) {}
-        @Override public void error(CharSequence content) {}
-        @Override public void error(CharSequence content, Throwable t) {}
-        @Override public void error(Throwable t) {}
-        @Override public boolean isInfoEnabled() { return true; }
-        @Override public boolean isWarnEnabled() { return true; }
-        @Override public boolean isErrorEnabled() { return true; }
-    }
 }

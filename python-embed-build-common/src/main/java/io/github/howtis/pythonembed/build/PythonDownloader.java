@@ -117,21 +117,7 @@ public final class PythonDownloader {
 
     private static String detectTargetTriple(String targetOs) {
         String arch = System.getProperty("os.arch", "").toLowerCase();
-        return switch (targetOs) {
-            case "windows" -> "x86_64-pc-windows-msvc";
-            case "macos" -> {
-                if (arch.contains("aarch64") || arch.contains("arm")) {
-                    yield "aarch64-apple-darwin";
-                }
-                yield "x86_64-apple-darwin";
-            }
-            default -> {
-                if (arch.contains("aarch64") || arch.contains("arm64")) {
-                    yield "aarch64-unknown-linux-gnu";
-                }
-                yield "x86_64-unknown-linux-gnu";
-            }
-        };
+        return PythonResolver.detectTargetTriple(targetOs, arch);
     }
 
     private static String fetchLatestReleaseTag(Consumer<String> logger) throws IOException {

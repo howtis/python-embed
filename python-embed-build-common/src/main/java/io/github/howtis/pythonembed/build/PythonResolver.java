@@ -101,18 +101,33 @@ public final class PythonResolver {
      *         "x86_64-apple-darwin", or "aarch64-apple-darwin"
      */
     public static String detectTargetTriple() {
-        String osName = System.getProperty("os.name", "").toLowerCase();
         String osArch = System.getProperty("os.arch", "").toLowerCase();
+        return detectTargetTriple(detectTargetOs(), osArch);
+    }
 
-        if (osName.contains("win")) {
-            return "x86_64-pc-windows-msvc";
-        } else if (osName.contains("mac")) {
-            return osArch.contains("aarch64")
-                    ? "aarch64-apple-darwin"
-                    : "x86_64-apple-darwin";
-        } else {
-            return "x86_64-unknown-linux-gnu";
-        }
+    /**
+     * Detects the target triple for python-build-standalone downloads.
+     *
+     * @param targetOs "windows", "linux", or "macos"
+     * @param arch     "x86_64", "amd64", "aarch64", "arm64", etc.
+     * @return target triple string for python-build-standalone
+     */
+    public static String detectTargetTriple(String targetOs, String arch) {
+        return switch (targetOs) {
+            case "windows" -> "x86_64-pc-windows-msvc";
+            case "macos" -> {
+                if (arch.contains("aarch64") || arch.contains("arm")) {
+                    yield "aarch64-apple-darwin";
+                }
+                yield "x86_64-apple-darwin";
+            }
+            default -> {
+                if (arch.contains("aarch64") || arch.contains("arm64")) {
+                    yield "aarch64-unknown-linux-gnu";
+                }
+                yield "x86_64-unknown-linux-gnu";
+            }
+        };
     }
 
     /**

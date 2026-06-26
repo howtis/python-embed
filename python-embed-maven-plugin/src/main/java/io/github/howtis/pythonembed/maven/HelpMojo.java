@@ -108,6 +108,7 @@ public class HelpMojo extends AbstractMojo {
             sb.append(indent("skip", "Skip plugin execution (default: false)", indentSize));
             sb.append(indent("targetOs", "Target OS: windows, linux, macos (auto-detect if not set)", indentSize));
         } else if ("properties".equals(goal)) {
+            sb.append(indent("venvOutputDir", "Venv output directory (default: ${project.build.directory}/python-venv)", indentSize));
             sb.append(indent("skip", "Skip plugin execution (default: false)", indentSize));
         } else if ("help".equals(goal)) {
             sb.append(indent("detail", "Display all settable properties (default: false)", indentSize));
