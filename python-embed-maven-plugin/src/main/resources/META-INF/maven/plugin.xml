@@ -4,7 +4,7 @@
   <description>Maven plugin to create Python venv, install packages, and auto-download CPython for JVM embedding</description>
   <groupId>io.github.howtis</groupId>
   <artifactId>python-embed-maven-plugin</artifactId>
-  <version>1.0.2</version>
+  <version>${version}</version>
   <goalPrefix>python-embed</goalPrefix>
   <isolatedRealm>false</isolatedRealm>
   <inheritedByDefault>true</inheritedByDefault>
