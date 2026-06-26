@@ -1,3 +1,5 @@
+[English](README.md) | [한국어](README.ko.md)
+
 # PythonEmbed
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
