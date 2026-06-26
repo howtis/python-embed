@@ -160,7 +160,7 @@ public abstract class VenvTask extends DefaultTask {
         try {
             return PythonResolver.findPythonInDir(dir, targetOs);
         } catch (IOException e) {
-            return null;
+            throw new GradleException("Failed to search for Python executable in: " + dir, e);
         }
     }
 
