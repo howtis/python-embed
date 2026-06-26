@@ -295,6 +295,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             return protocol.sendEval(writer, code);
         } catch (TimeoutException | IOException e) {
@@ -313,6 +316,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(String code, long timeoutMs) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             return protocol.sendEval(writer, code, timeoutMs);
         } catch (TimeoutException | IOException e) {
@@ -329,6 +335,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             protocol.sendExec(writer, code);
         } catch (TimeoutException | IOException e) {
@@ -346,6 +355,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(String code, long timeoutMs) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             protocol.sendExec(writer, code, timeoutMs);
         } catch (TimeoutException | IOException e) {
@@ -366,6 +378,9 @@ public class PythonEmbed implements AutoCloseable {
      * @throws IOException if the file cannot be read
      */
     public void execFile(Path scriptPath) throws IOException {
+        if (scriptPath == null) {
+            throw new IllegalArgumentException("scriptPath must not be null");
+        }
         String code = Files.readString(scriptPath);
         exec(code);
     }
@@ -381,6 +396,9 @@ public class PythonEmbed implements AutoCloseable {
      * @throws IOException if the file cannot be read
      */
     public void execFile(Path scriptPath, long timeoutMs) throws IOException {
+        if (scriptPath == null) {
+            throw new IllegalArgumentException("scriptPath must not be null");
+        }
         String code = Files.readString(scriptPath);
         exec(code, timeoutMs);
     }
@@ -411,6 +429,12 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(Map<String, Object> variables, String code) {
+        if (variables == null) {
+            throw new IllegalArgumentException("variables must not be null");
+        }
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         if (variables.isEmpty()) {
             try {
                 return protocol.sendEval(writer, code);
@@ -440,6 +464,12 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(Map<String, Object> variables, String code, long timeoutMs) {
+        if (variables == null) {
+            throw new IllegalArgumentException("variables must not be null");
+        }
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         if (variables.isEmpty()) {
             try {
                 return protocol.sendEval(writer, code, timeoutMs);
@@ -468,6 +498,12 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(Map<String, Object> variables, String code) {
+        if (variables == null) {
+            throw new IllegalArgumentException("variables must not be null");
+        }
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         String fullCode = buildWithVariables(variables, code);
         try {
             protocol.sendExec(writer, fullCode);
@@ -488,6 +524,12 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(Map<String, Object> variables, String code, long timeoutMs) {
+        if (variables == null) {
+            throw new IllegalArgumentException("variables must not be null");
+        }
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         String fullCode = buildWithVariables(variables, code);
         try {
             protocol.sendExec(writer, fullCode, timeoutMs);
@@ -535,6 +577,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void warmup(String script) {
+        if (script == null || script.isBlank()) {
+            throw new IllegalArgumentException("script must not be null or blank");
+        }
         try {
             protocol.sendExec(writer, script, options.timeoutMs());
         } catch (TimeoutException | IOException e) {
@@ -570,6 +615,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the batch times out
      */
     public List<PythonValue> batchEval(List<String> codes, long timeoutMs) {
+        if (codes == null) {
+            throw new IllegalArgumentException("codes must not be null");
+        }
         try {
             return protocol.sendBatchEval(writer, codes, timeoutMs);
         } catch (TimeoutException | IOException e) {
@@ -602,6 +650,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the batch times out
      */
     public void batchExec(List<String> codes, long timeoutMs) {
+        if (codes == null) {
+            throw new IllegalArgumentException("codes must not be null");
+        }
         try {
             protocol.sendBatchExec(writer, codes, timeoutMs);
         } catch (TimeoutException | IOException e) {
@@ -619,6 +670,9 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonHandle ref(String variableName) {
+        if (variableName == null || variableName.isBlank()) {
+            throw new IllegalArgumentException("variableName must not be null or blank");
+        }
         try {
             Map<String, Object> refInfo = protocol.sendRef(writer, variableName);
             int refId = ((Number) refInfo.get("ref_id")).intValue();
@@ -719,6 +773,9 @@ public class PythonEmbed implements AutoCloseable {
      * @throws PythonExecutionException if the stream request fails
      */
     public Iterator<PythonValue> stream(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             return protocol.sendStream(writer, code);
         } catch (IOException e) {
@@ -736,6 +793,9 @@ public class PythonEmbed implements AutoCloseable {
      * @throws PythonExecutionException if the stream request fails
      */
     public Iterator<PythonValue> stream(String code, long pollTimeoutMs) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be null or blank");
+        }
         try {
             return protocol.sendStream(writer, code, pollTimeoutMs);
         } catch (IOException e) {
