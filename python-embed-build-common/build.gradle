@@ -1,0 +1,61 @@
+plugins {
+    id 'java-library'
+    id 'com.vanniktech.maven.publish' version '0.34.0'
+}
+
+group = 'io.github.howtis'
+version = project.findProperty('releaseVersion') ?: '1.0.2'
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(true)
+    signAllPublications()
+    pom {
+        name = 'python-embed-build-common'
+        description = 'Shared build utilities for python-embed Gradle and Maven plugins'
+        url = 'https://github.com/howtis/python-embed'
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
+        }
+        developers {
+            developer {
+                id = 'howtis'
+                name = 'howtis'
+                url = 'https://github.com/howtis'
+            }
+        }
+        scm {
+            url = 'https://github.com/howtis/python-embed'
+            connection = 'scm:git:git://github.com/howtis/python-embed.git'
+            developerConnection = 'scm:git:ssh://github.com/howtis/python-embed.git'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+tasks.named('jar') {
+    metaInf {
+        from rootProject.file('../LICENSE')
+    }
+}
+
+test {
+    useJUnitPlatform()
+}

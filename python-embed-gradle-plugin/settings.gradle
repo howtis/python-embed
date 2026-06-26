@@ -1,1 +1,3 @@
 rootProject.name = 'python-embed-gradle-plugin'
+
+includeBuild '../python-embed-build-common'

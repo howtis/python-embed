@@ -2,6 +2,8 @@
 
 ## Gradle Plugin
 
+[:fontawesome-brands-github: View source](https://github.com/howtis/python-embed/tree/main/python-embed-gradle-plugin)
+
 Add the plugin to `build.gradle`:
 
 ```groovy
@@ -53,6 +55,8 @@ The venv is rebuilt incrementally — only when dependencies change.
 
 ## Spring Boot Starter
 
+[:fontawesome-brands-github: View source](https://github.com/howtis/python-embed/tree/main/python-embed-spring-boot-starter)
+
 For Spring Boot 3.x applications, add the starter:
 
 ```groovy
@@ -63,8 +67,79 @@ dependencies {
 
 This provides zero-code auto-configuration. See the [Spring Boot guide](spring-boot.md).
 
+## Maven Plugin
+
+[:fontawesome-brands-github: View source](https://github.com/howtis/python-embed/tree/main/python-embed-maven-plugin)
+
+Add the plugin to `pom.xml`:
+
+```xml
+<build>
+  <plugins>
+    <plugin>
+      <groupId>io.github.howtis</groupId>
+      <artifactId>python-embed-maven-plugin</artifactId>
+      <version>1.0.2</version>
+      <executions>
+        <execution>
+          <goals>
+            <goal>setup</goal>
+          </goals>
+        </execution>
+      </executions>
+      <configuration>
+        <packages>
+          <package>numpy</package>
+          <package>torch</package>
+        </packages>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+```
+
+### Goals
+
+| Goal | Phase | Description |
+|------|-------|-------------|
+| `setup` | `generate-resources` | Creates a Python venv and installs packages |
+| `properties` | `generate-resources` | Generates `META-INF/python-embed.properties` for runtime discovery |
+| `help` | — | Displays usage information |
+
+The `properties` goal automatically runs after `setup` via `@Execute`.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `packages` | `List<String>` | `[]` | Pip packages to install |
+| `pythonVersion` | `String` | `3.12` | Python version for auto-download |
+| `venvOutputDir` | `File` | `${project.build.directory}/python-venv` | Venv output directory |
+| `requirementsFile` | `File` | — | Path to `requirements.txt` |
+| `pyprojectTomlFile` | `File` | — | Path to `pyproject.toml` |
+| `pipIndexUrl` | `String` | — | Custom pip index URL |
+| `pipExtraArgs` | `List<String>` | `[]` | Extra pip install arguments |
+| `skip` | `boolean` | `false` | Skip plugin execution |
+| `targetOs` | `String` | auto-detected | Target OS: `windows`, `linux`, or `macos` |
+
+### Usage
+
+```bash
+# Run setup directly
+mvn python-embed:setup
+
+# Generate properties
+mvn python-embed:properties
+
+# Show help
+mvn python-embed:help
+
+# Skip plugin execution
+mvn compile -Dpython-embed.skip=true
+```
+
 ## Requirements
 
 - JDK 17+
 - Python 3.8+ (auto-downloaded if absent via python-build-standalone)
-- Gradle 8.x
+- Gradle 8.x (Gradle plugin) or Maven 3.9+ (Maven plugin)

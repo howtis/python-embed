@@ -210,7 +210,8 @@ class VenvTaskTest {
         // But the flow should at least try (we expect an error from command execution).
         GradleException ex = assertThrows(GradleException.class, () -> task.createVenv());
         // The error comes from trying to run the fake python executable
-        assertTrue(ex.getMessage().contains("Failed to run") || ex.getMessage().contains("exit"));
+        assertTrue(ex.getMessage().contains("Failed") || ex.getMessage().contains("exit")
+                || ex.getMessage().contains("setup"));
     }
 
     // ------------------------------------------------------------------

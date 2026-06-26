@@ -30,6 +30,7 @@ gradlePlugin {
 
 dependencies {
     implementation gradleApi()
+    implementation 'io.github.howtis:python-embed-build-common'
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -39,6 +40,10 @@ tasks.named('jar') {
     metaInf {
         from rootProject.file('../LICENSE')
     }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
 
 test {

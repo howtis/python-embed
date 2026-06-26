@@ -1,5 +1,6 @@
 package io.github.howtis.pythonembed.gradle;
 
+import io.github.howtis.pythonembed.build.RequirementsParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
