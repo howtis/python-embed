@@ -4,7 +4,6 @@
 
 ### Changed
 - Extracted shared build logic into `python-embed-build-common` (VenvManager, PythonDownloader, FingerprintManager, etc.)
-- `VenvTask` simplified from ~738 to ~188 lines by delegating to `VenvManager`
 - Removed `RequirementsParser` — now provided by build-common
 - Cache path standardized: `~/.gradle/python-embed` → `~/.python-embed`
 - Added `implementation 'io.github.howtis:python-embed-build-common'` dependency

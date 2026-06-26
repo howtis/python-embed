@@ -4,7 +4,7 @@
 
 - [python-embed-build-common](python-embed-build-common/CHANGELOG.md) (1.0.2) — shared build logic for Gradle/Maven plugins
 - [python-embed-maven-plugin](python-embed-maven-plugin/CHANGELOG.md) (1.0.2) — `python-embed:setup`, `python-embed:properties`, `python-embed:help` goals
-- [python-embed-gradle-plugin](python-embed-gradle-plugin/CHANGELOG.md) (1.0.3) — refactored to use build-common (~738→~188 lines in VenvTask)
+- [python-embed-gradle-plugin](python-embed-gradle-plugin/CHANGELOG.md) (1.0.3) — refactored to use build-common
 - Split publish workflows into per-module files (`publish-build-common.yml`, `publish-maven-plugin.yml`, `publish-gradle-plugin.yml`, etc.)
 
 ## [1.0.3] - 2026-06-25
