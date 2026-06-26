@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.3] - 2026-06-26
+
+### Changed
+- Extracted shared build logic into `python-embed-build-common` (VenvManager, PythonDownloader, FingerprintManager, etc.)
+- `VenvTask` simplified from ~738 to ~188 lines by delegating to `VenvManager`
+- Removed `RequirementsParser` — now provided by build-common
+- Cache path standardized: `~/.gradle/python-embed` → `~/.python-embed`
+- Added `implementation 'io.github.howtis:python-embed-build-common'` dependency
+
+### Added
+- `pyprojectTomlFile` property for pyproject.toml-based dependency installation
+- `pipIndexUrl` and `pipExtraArgs` properties in `VenvTask`
+- `@Optional` annotations on all task properties for Gradle up-to-date checks
+- `sourcesJar` for Maven Central compliance
+- Java toolchain configuration (JDK 17)
+
+### Fixed
+- FingerprintManager consistency improvements for incremental rebuild
+- Javadoc improvements across extension and task classes
+
 ## [1.0.2] - 2026-06-24
 
 ### Added
@@ -29,6 +49,7 @@
 - `PythonEmbedExtension` for plugin configuration (pythonPath, packages, requirementsFile, targetOs)
 - `VenvTask` with pip install, dependency hash tracking, and platform detection
 
+[plugin-v1.0.3]: https://github.com/howtis/python-embed/releases/tag/plugin-v1.0.3
 [plugin-v1.0.2]: https://github.com/howtis/python-embed/releases/tag/plugin-v1.0.2
 [plugin-v1.0.1]: https://github.com/howtis/python-embed/releases/tag/v1.0.1
 [plugin-v1.0.0]: https://github.com/howtis/python-embed/releases/tag/v1.0.0
