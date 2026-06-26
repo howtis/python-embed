@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -95,6 +96,7 @@ public class PythonEmbedPool implements AutoCloseable {
         volatile boolean busy;
         volatile long lastUsedAt;
         volatile boolean removed;
+        volatile boolean dirty;
 
         PooledInstance(PythonEmbed embed) {
             this.embed = embed;
@@ -248,20 +250,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<PythonValue> eval(String code) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.eval(code);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.eval(code));
     }
 
     /**
@@ -274,20 +263,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<PythonValue> eval(String code, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.eval(code, timeoutMs);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.eval(code, timeoutMs));
     }
 
     /**
@@ -299,21 +275,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> exec(String code) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.exec(code);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.exec(code);
+            return null;
+        });
     }
 
     /**
@@ -326,21 +291,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> exec(String code, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.exec(code, timeoutMs);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.exec(code, timeoutMs);
+            return null;
+        });
     }
 
     /**
@@ -351,21 +305,14 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> execFile(Path scriptPath) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
+        return submitWithEmbed(embed -> {
             try {
-                pi = acquireInstance();
-                pi.embed.execFile(scriptPath);
-                return null;
+                embed.execFile(scriptPath);
             } catch (IOException e) {
                 throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
             }
-        }, executor);
+            return null;
+        });
     }
 
     /**
@@ -378,21 +325,14 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> execFile(Path scriptPath, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
+        return submitWithEmbed(embed -> {
             try {
-                pi = acquireInstance();
-                pi.embed.execFile(scriptPath, timeoutMs);
-                return null;
+                embed.execFile(scriptPath, timeoutMs);
             } catch (IOException e) {
                 throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
             }
-        }, executor);
+            return null;
+        });
     }
 
     /**
@@ -404,20 +344,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<PythonValue> eval(Map<String, Object> variables, String code) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.eval(variables, code);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.eval(variables, code));
     }
 
     /**
@@ -432,20 +359,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<PythonValue> eval(Map<String, Object> variables, String code, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.eval(variables, code, timeoutMs);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.eval(variables, code, timeoutMs));
     }
 
     /**
@@ -457,21 +371,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> exec(Map<String, Object> variables, String code) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.exec(variables, code);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.exec(variables, code);
+            return null;
+        });
     }
 
     /**
@@ -486,21 +389,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> exec(Map<String, Object> variables, String code, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.exec(variables, code, timeoutMs);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.exec(variables, code, timeoutMs);
+            return null;
+        });
     }
 
     /**
@@ -511,20 +403,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<List<PythonValue>> batchEval(List<String> codes) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.batchEval(codes);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.batchEval(codes));
     }
 
     /**
@@ -538,20 +417,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<List<PythonValue>> batchEval(List<String> codes, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.batchEval(codes, timeoutMs);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.batchEval(codes, timeoutMs));
     }
 
     /**
@@ -562,21 +428,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> batchExec(List<String> codes) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.batchExec(codes);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.batchExec(codes);
+            return null;
+        });
     }
 
     /**
@@ -590,21 +445,10 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<Void> batchExec(List<String> codes, long timeoutMs) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                pi.embed.batchExec(codes, timeoutMs);
-                return null;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> {
+            embed.batchExec(codes, timeoutMs);
+            return null;
+        });
     }
 
     /**
@@ -672,20 +516,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws IllegalStateException if the pool is closed
      */
     public CompletableFuture<PythonHandle> ref(String variableName) {
-        checkOpen();
-        return CompletableFuture.supplyAsync(() -> {
-            PooledInstance pi = null;
-            try {
-                pi = acquireInstance();
-                return pi.embed.ref(variableName);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            } finally {
-                if (pi != null) {
-                    releaseInstance(pi);
-                }
-            }
-        }, executor);
+        return submitWithEmbed(embed -> embed.ref(variableName));
     }
 
     /**
@@ -788,7 +619,6 @@ public class PythonEmbedPool implements AutoCloseable {
      * @throws PythonExecutionException if ref resolution fails
      * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
      */
-    @SuppressWarnings("unchecked")
     public <T> T proxy(String variableName, Class<T> interfaceClass) {
         PythonHandle handle = ref(variableName).join();
         return proxy(handle, interfaceClass);
@@ -962,9 +792,14 @@ public class PythonEmbedPool implements AutoCloseable {
     }
 
     /**
-     * Gracefully shuts down the pool with a configurable timeout per instance.
+     * Gracefully shuts down the pool with a configurable timeout.
+     * <p>
+     * When {@code timeout > 0}, the method first waits for all in-flight
+     * tasks to complete before closing instances. Use {@code timeout = 0}
+     * for immediate forced shutdown.
      *
-     * @param timeout the maximum time to wait for each instance's graceful shutdown
+     * @param timeout the maximum time to wait for in-flight tasks
+     *                and close each instance
      * @param unit the time unit of the timeout argument
      */
     public void close(long timeout, TimeUnit unit) {
@@ -978,9 +813,11 @@ public class PythonEmbedPool implements AutoCloseable {
             // Hook may have already run or been removed
         }
 
-        // Stop accepting new work.
-        // Graceful shutdown first to let in-flight maintenance complete,
-        // then force-shutdown after a short timeout.
+        // Phase 1: Wait for in-flight tasks to complete
+        long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+        awaitInFlightTasks(deadline);
+
+        // Phase 2: Stop maintenance executor
         maintenanceExecutor.shutdown();
         try {
             if (!maintenanceExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
@@ -992,18 +829,54 @@ public class PythonEmbedPool implements AutoCloseable {
         }
         executor.shutdown();
 
-        // Close all instances with the given timeout
+        // Phase 3: Close all instances with the remaining timeout
         CloseReason reason = CloseReason.USER;
         for (PooledInstance pi : instances) {
             notifyInstanceRemoved(pi.embed, reason);
+            long remaining = deadline - System.currentTimeMillis();
             try {
-                pi.embed.close(timeout, unit);
+                pi.embed.close(Math.max(remaining, 0), TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Error closing pooled PythonEmbed", e);
             }
         }
         instances.clear();
         currentSize.set(0);
+    }
+
+    /**
+     * Waits for all in-flight tasks to complete before shutdown.
+     * <p>
+     * Blocks on {@code instanceAvailable} condition until every instance
+     * is idle or the deadline expires. If timeout is zero (deadline already
+     * past), returns immediately without waiting.
+     */
+    private void awaitInFlightTasks(long deadline) {
+        instanceLock.lock();
+        try {
+            while (true) {
+                boolean allIdle = true;
+                for (PooledInstance pi : instances) {
+                    if (pi.busy) {
+                        allIdle = false;
+                        break;
+                    }
+                }
+                if (allIdle) return;
+
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) return;
+
+                try {
+                    instanceAvailable.await(remaining, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        } finally {
+            instanceLock.unlock();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1094,7 +967,49 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     void releaseInstance(PooledInstance pi) {
         pi.busy = false;
+        if (pi.dirty) {
+            replaceInstance(pi);
+            return;
+        }
         pi.lastUsedAt = System.currentTimeMillis();
+        instanceSemaphore.release();
+        instanceLock.lock();
+        try {
+            instanceAvailable.signal();
+        } finally {
+            instanceLock.unlock();
+        }
+    }
+
+    /**
+     * Replaces a dirty (cancelled) instance with a fresh one.
+     * <p>
+     * Called from {@link #releaseInstance(PooledInstance)} when an
+     * instance has been marked dirty due to task cancellation.
+     * The old instance's Python process is closed, and a new
+     * instance is created to maintain pool capacity.
+     */
+    private void replaceInstance(PooledInstance dirty) {
+        instances.remove(dirty);
+        notifyInstanceRemoved(dirty.embed, CloseReason.CANCELLED);
+        try {
+            dirty.embed.close();
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Error closing cancelled instance", e);
+        }
+
+        if (closed) {
+            currentSize.decrementAndGet();
+        } else {
+            try {
+                PythonEmbed embed = createEmbed();
+                instances.add(new PooledInstance(embed));
+            } catch (Exception e) {
+                currentSize.decrementAndGet();
+                logger.log(Level.WARNING, "Failed to create replacement instance after cancel", e);
+            }
+        }
+
         instanceSemaphore.release();
         instanceLock.lock();
         try {
@@ -1281,6 +1196,35 @@ public class PythonEmbedPool implements AutoCloseable {
         if (closed) {
             throw new IllegalStateException("Pool is closed");
         }
+    }
+
+    /**
+     * Submits a task that acquires a pool instance, executes the given
+     * function, and releases the instance. Handles interrupt detection
+     * and dirty flagging for task cancellation.
+     *
+     * @param <T> the result type of the task
+     * @param task the function to execute with a pooled PythonEmbed
+     * @return a future that completes with the task's result
+     */
+    private <T> CompletableFuture<T> submitWithEmbed(Function<PythonEmbed, T> task) {
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            PooledInstance pi = null;
+            try {
+                pi = acquireInstance();
+                return task.apply(pi.embed);
+            } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted() && pi != null) {
+                    pi.dirty = true;
+                }
+                throw new CompletionException(e);
+            } finally {
+                if (pi != null) {
+                    releaseInstance(pi);
+                }
+            }
+        }, executor);
     }
 
     // ------------------------------------------------------------------

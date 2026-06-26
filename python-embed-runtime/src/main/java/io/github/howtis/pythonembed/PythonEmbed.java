@@ -295,14 +295,7 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be null or blank");
-        }
-        try {
-            return protocol.sendEval(writer, code);
-        } catch (TimeoutException | IOException e) {
-            throw PythonExecutionException.wrap("eval", e);
-        }
+        return eval(code, 0);
     }
 
     /**
@@ -335,14 +328,7 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be null or blank");
-        }
-        try {
-            protocol.sendExec(writer, code);
-        } catch (TimeoutException | IOException e) {
-            throw PythonExecutionException.wrap("exec", e);
-        }
+        exec(code, 0);
     }
 
     /**
@@ -429,26 +415,7 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public PythonValue eval(Map<String, Object> variables, String code) {
-        if (variables == null) {
-            throw new IllegalArgumentException("variables must not be null");
-        }
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be null or blank");
-        }
-        if (variables.isEmpty()) {
-            try {
-                return protocol.sendEval(writer, code);
-            } catch (TimeoutException | IOException e) {
-                throw PythonExecutionException.wrap("eval", e);
-            }
-        }
-        String assignCode = buildAssignments(variables);
-        try {
-            protocol.sendExec(writer, assignCode);
-            return protocol.sendEval(writer, code);
-        } catch (TimeoutException | IOException e) {
-            throw PythonExecutionException.wrap("eval", e);
-        }
+        return eval(variables, code, 0);
     }
 
     /**
@@ -498,18 +465,7 @@ public class PythonEmbed implements AutoCloseable {
      *         communication with the Python process fails, or the request times out
      */
     public void exec(Map<String, Object> variables, String code) {
-        if (variables == null) {
-            throw new IllegalArgumentException("variables must not be null");
-        }
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be null or blank");
-        }
-        String fullCode = buildWithVariables(variables, code);
-        try {
-            protocol.sendExec(writer, fullCode);
-        } catch (TimeoutException | IOException e) {
-            throw PythonExecutionException.wrap("exec", e);
-        }
+        exec(variables, code, 0);
     }
 
     /**
@@ -773,14 +729,7 @@ public class PythonEmbed implements AutoCloseable {
      * @throws PythonExecutionException if the stream request fails
      */
     public Iterator<PythonValue> stream(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be null or blank");
-        }
-        try {
-            return protocol.sendStream(writer, code);
-        } catch (IOException e) {
-            throw PythonExecutionException.wrap("stream", e);
-        }
+        return stream(code, 0);
     }
 
     /**

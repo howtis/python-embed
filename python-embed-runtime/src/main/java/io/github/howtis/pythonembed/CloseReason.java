@@ -12,5 +12,7 @@ public enum CloseReason {
     /** Pool idle scale-down removal. */
     POOL_CLEANUP,
     /** Pool health check removal (unhealthy instance). */
-    HEALTH_CHECK
+    HEALTH_CHECK,
+    /** Task cancelled via {@code CompletableFuture.cancel(true)}. */
+    CANCELLED
 }

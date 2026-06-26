@@ -16,6 +16,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -1518,6 +1519,90 @@ class PythonEmbedPoolTest {
         } finally {
             hookPool.close();
         }
+    }
+
+    // ---- D2: Task Cancel ----
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void cancel_runningTask_replacesInstance() throws Exception {
+        PythonEmbedPool cancelPool = PythonEmbedPool.builder().maxPool(1).build();
+        try {
+            CompletableFuture<PythonValue> future = cancelPool.eval(
+                    "__import__('time').sleep(10)");
+
+            Thread.sleep(300);
+            assertEquals(1, cancelPool.activeCount(), "Instance should be busy");
+            int sizeBeforeCancel = cancelPool.size();
+
+            boolean cancelled = future.cancel(true);
+            assertTrue(cancelled, "cancel should return true");
+
+            assertThrows(CancellationException.class,
+                    () -> future.get(1, TimeUnit.SECONDS));
+
+            // Wait for instance replacement
+            Thread.sleep(500);
+
+            assertEquals(sizeBeforeCancel, cancelPool.size(),
+                    "Pool size should be maintained after cancel");
+
+            // Pool should still be usable
+            PythonValue result = cancelPool.eval("42").get(5, TimeUnit.SECONDS);
+            assertEquals(42, result.asInt());
+        } finally {
+            cancelPool.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void cancel_onClosedPool() throws Exception {
+        PythonEmbedPool cancelPool = PythonEmbedPool.builder().maxPool(1).build();
+        CompletableFuture<PythonValue> future = cancelPool.eval(
+                "__import__('time').sleep(2)");
+
+        Thread.sleep(200);
+        cancelPool.close();
+
+        assertDoesNotThrow(() -> future.cancel(true));
+    }
+
+    // ---- D3: Graceful close ----
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    void close_waitsForInFlight() throws Exception {
+        PythonEmbedPool closePool = PythonEmbedPool.builder().maxPool(1).build();
+
+        long start = System.currentTimeMillis();
+        CompletableFuture<Void> task = closePool.exec(
+                "__import__('time').sleep(3)");
+
+        Thread.sleep(300);
+
+        closePool.close(10, TimeUnit.SECONDS);
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue(elapsed >= 2500,
+                "close() should have waited for in-flight task, elapsed=" + elapsed + "ms");
+        assertTrue(task.isDone(), "Task should be done after close waited");
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void close_timeout_zero() throws Exception {
+        PythonEmbedPool closePool = PythonEmbedPool.builder().maxPool(1).build();
+
+        closePool.eval("__import__('time').sleep(10)");
+        Thread.sleep(200);
+
+        long start = System.currentTimeMillis();
+        closePool.close(0, TimeUnit.SECONDS);
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue(elapsed < 5000,
+                "close(0, SECONDS) should return quickly, elapsed=" + elapsed + "ms");
     }
 
     /**
