@@ -64,4 +64,15 @@ try (PythonEmbed py = PythonEmbed.create()) {
 }
 ```
 
+## Advanced Configuration
+
+The example `pom.xml` includes commented-out examples of advanced settings:
+
+- **Cross-compilation**: Use `<targetOs>` to build Python for a different OS (e.g., `windows`, `linux`, `macos`)
+- **Custom pip index**: Use `<pipIndexUrl>` to install from a custom package index (e.g., PyTorch CUDA)
+- **Extra pip arguments**: Use `<pipExtraArgs>` for flags like `--extra-index-url`
+- **pyproject.toml**: Use `<pyprojectTomlFile>` to install dependencies from a `pyproject.toml`
+- **Python version**: Use `<pythonVersion>` to specify the standalone Python version
+- **requirements.txt**: Use `<requirementsFile>` to load dependencies from `requirements.txt`
+
 See [Installation](../installation.md) for detailed Maven configuration.

@@ -43,6 +43,27 @@
                     <packages>
                         <package>numpy</package>
                     </packages>
+
+                    <!-- Advanced: cross-compile for a different OS (e.g., build Windows Python on Linux) -->
+                    <!-- <targetOs>windows</targetOs> -->
+
+                    <!-- Advanced: use custom pip index (e.g., PyTorch CUDA) -->
+                    <!-- <pipIndexUrl>https://download.pytorch.org/whl/cu118</pipIndexUrl> -->
+
+                    <!-- Advanced: pass extra pip install arguments -->
+                    <!-- <pipExtraArgs> -->
+                    <!--     <pipExtraArg>--extra-index-url</pipExtraArg> -->
+                    <!--     <pipExtraArg>https://example.com/simple</pipExtraArg> -->
+                    <!-- </pipExtraArgs> -->
+
+                    <!-- Advanced: install dependencies from pyproject.toml -->
+                    <!-- <pyprojectTomlFile>pyproject.toml</pyprojectTomlFile> -->
+
+                    <!-- Advanced: specify Python version for download -->
+                    <!-- <pythonVersion>3.11</pythonVersion> -->
+
+                    <!-- Advanced: use requirements.txt for dependencies -->
+                    <!-- <requirementsFile>requirements.txt</requirementsFile> -->
                 </configuration>
             </plugin>
             <plugin>

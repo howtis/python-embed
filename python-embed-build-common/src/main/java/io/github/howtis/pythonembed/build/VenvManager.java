@@ -33,6 +33,7 @@ public final class VenvManager {
     public static PythonEnvironment setup(VenvConfig config) throws IOException {
         Consumer<String> log = config.logger();
         Path venvDir = config.venvDir();
+        String resolvedTargetOs = PythonResolver.resolveTargetOs(config.targetOs());
 
         // Collect packages
         List<String> packages = new ArrayList<>(config.packages());
@@ -73,14 +74,14 @@ public final class VenvManager {
 
         // Check stored fingerprint
         FingerprintManager.Fingerprint stored = FingerprintManager.read(venvDir);
-        boolean pythonPresent = PythonResolver.findPythonInDir(venvDir) != null;
+        boolean pythonPresent = PythonResolver.findPythonInDir(venvDir, resolvedTargetOs) != null;
         boolean pythonVersionMatch = stored != null && pythonVersion.equals(stored.pythonVersion);
         boolean packagesMatch = stored != null && currentPackageHash.equals(stored.packageHash);
         boolean sourceKnown = stored != null && stored.pythonSource != null;
 
         if (pythonPresent && pythonVersionMatch && packagesMatch && sourceKnown) {
             log.accept("Python environment is up to date, skipping setup");
-            Path pythonExe = PythonResolver.findPythonInDir(venvDir);
+            Path pythonExe = PythonResolver.findPythonInDir(venvDir, resolvedTargetOs);
             return new PythonEnvironment(pythonExe, venvDir, stored.pythonSource);
         }
 
@@ -99,21 +100,19 @@ public final class VenvManager {
             if (systemPython != null && !systemPython.contains(java.io.File.separator)) {
                 // System Python found
                 pythonSource = "system";
-                String targetOs = PythonResolver.resolveTargetOs(config.targetOs());
                 log.accept("Creating venv...");
                 runCommand(log, systemPython, "-m", "venv", venvDir.toString());
                 pythonExe = PythonResolver.resolveVenvPython(venvDir);
             } else {
                 // Download python-build-standalone
                 pythonSource = "bundled";
-                String targetOs = PythonResolver.resolveTargetOs(config.targetOs());
                 Path cacheDir = Path.of(System.getProperty("user.home"),
                         ".python-embed");
                 log.accept("System Python not found. Downloading python-build-standalone...");
-                pythonExe = PythonDownloader.download(pythonVersion, targetOs, cacheDir, venvDir, log);
+                pythonExe = PythonDownloader.download(pythonVersion, resolvedTargetOs, cacheDir, venvDir, log);
             }
         } else {
-            pythonExe = PythonResolver.findPythonInDir(venvDir);
+            pythonExe = PythonResolver.findPythonInDir(venvDir, resolvedTargetOs);
             if (pythonExe == null) {
                 throw new IOException("Python executable not found in: " + venvDir);
             }
