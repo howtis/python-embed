@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.5] - 2026-06-27
+
+- [python-embed-runtime](python-embed-runtime/CHANGELOG.md) (1.0.3) — Sticky Session for `ref()` handles: idle scale-down no longer invalidates active handles; `proxy(int refId, Class)` deprecated
+
 ## [1.0.4] - 2026-06-26
 
 - [python-embed-build-common](python-embed-build-common/CHANGELOG.md) (1.0.2) — shared build logic for Gradle/Maven plugins
@@ -46,6 +50,7 @@ Modules are now independently versioned with per-module changelogs:
 - Close hook support for resource cleanup
 - 13 example applications in `python-embed-examples`
 
+[1.0.5]: See per-module changelogs above
 [1.0.4]: See per-module changelogs above
 [1.0.3]: See per-module changelogs above
 [1.0.2]: See per-module changelogs above

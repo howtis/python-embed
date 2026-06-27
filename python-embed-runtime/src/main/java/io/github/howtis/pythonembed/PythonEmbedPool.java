@@ -506,10 +506,9 @@ public class PythonEmbedPool implements AutoCloseable {
     /**
      * Creates a handle to a Python variable asynchronously.
      *
-     * <p><b>Important:</b> The returned handle is bound to a specific
-     * {@link PythonEmbed} instance. If that instance is removed during
-     * idle scale-down, the handle becomes invalid. Callers should
-     * complete their work with the handle promptly.
+     * <p>The returned handle is bound to a specific {@link PythonEmbed}
+     * instance. As long as the handle has not been {@link PythonHandle#release() released},
+     * the owning instance is protected from idle scale-down.
      *
      * @param variableName the name of an existing Python variable
      * @return a future that completes with the handle
@@ -560,12 +559,11 @@ public class PythonEmbedPool implements AutoCloseable {
      * Creates a dynamic proxy that wraps a Python object as a Java interface,
      * with each method call acquiring and releasing a pool instance.
      *
-     *
-     * <pre>{@code
-     * PythonHandle handle = pool.ref("my_object").get();
-     * MyInterface obj = pool.proxy(handle, MyInterface.class);
-     * String result = obj.process("input");
-     * }</pre>
+     * @deprecated This method is inherently unsafe because {@code refId}
+     *             refers to an object in a specific Python process, but each
+     *             method call acquires a potentially different pool instance.
+     *             Use {@link #proxy(PythonHandle, Class)} instead, which routes
+     *             calls directly to the handle's owning instance.
      *
      * @param <T>            the interface type
      * @param refId          the Python object reference ID from {@link PythonHandle#refId()}
@@ -573,6 +571,7 @@ public class PythonEmbedPool implements AutoCloseable {
      * @return a dynamic proxy implementing the given interface
      * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
      */
+    @Deprecated(since = "1.0.5", forRemoval = false)
     @SuppressWarnings("unchecked")
     public <T> T proxy(int refId, Class<T> interfaceClass) {
         if (!interfaceClass.isInterface()) {
@@ -1085,9 +1084,11 @@ public class PythonEmbedPool implements AutoCloseable {
         while (it.hasNext()) {
             PooledInstance pi = it.next();
             if (currentSize.get() <= minPool) break;
-            if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
+            if (!pi.busy && !pi.embed.hasActiveHandles()
+                    && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                 synchronized (pi) {
-                    if (!pi.busy && (now - pi.lastUsedAt) >= idleTimeoutMs) {
+                    if (!pi.busy && !pi.embed.hasActiveHandles()
+                            && (now - pi.lastUsedAt) >= idleTimeoutMs) {
                         if (pi.removed) continue;
                         pi.removed = true;
                         if (currentSize.decrementAndGet() >= minPool) {

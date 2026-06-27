@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3] - 2026-06-27
+
+### Added
+- Sticky Session for `ref()` handles: `PythonEmbed.hasActiveHandles()` ensures instances with live handles are excluded from idle scale-down
+
+### Deprecated
+- `PythonEmbedPool.proxy(int refId, Class)` and `PythonEmbed.proxy(int refId, Class)` — use `proxy(PythonHandle, Class)` or `proxy(String, Class)` instead
+
 ## [1.0.2] - 2026-06-24
 
 ### Changed
@@ -28,6 +36,7 @@
 - Periodic health check with RSS memory, ref count, and GC status reporting
 - Close hook support for resource cleanup
 
+[runtime-v1.0.3]: https://github.com/howtis/python-embed/releases/tag/runtime-v1.0.3
 [runtime-v1.0.2]: https://github.com/howtis/python-embed/releases/tag/runtime-v1.0.2
 [runtime-v1.0.1]: https://github.com/howtis/python-embed/releases/tag/v1.0.1
 [runtime-v1.0.0]: https://github.com/howtis/python-embed/releases/tag/v1.0.0

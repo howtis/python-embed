@@ -655,11 +655,10 @@ public class PythonEmbed implements AutoCloseable {
      *
      * <p>Python exceptions are propagated as {@link PythonExecutionException}.
      *
-     * <pre>{@code
-     * PythonHandle handle = py.ref("my_object");
-     * MyInterface obj = py.proxy(handle.getRefId(), MyInterface.class);
-     * String result = obj.process("input");  // calls my_object.process("input")
-     * }</pre>
+     * @deprecated Prefer {@link #proxy(String, Class)} which manages handle
+     *             lifecycle automatically, or use
+     *             {@link PythonEmbedPool#proxy(PythonHandle, Class)} for
+     *             pool-scoped proxies.
      *
      * @param <T>            the interface type
      * @param refId          the Python object reference ID from {@link PythonHandle#refId()}
@@ -667,6 +666,7 @@ public class PythonEmbed implements AutoCloseable {
      * @return a dynamic proxy implementing the given interface
      * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
      */
+    @Deprecated(since = "1.0.5", forRemoval = false)
     @SuppressWarnings("unchecked")
     public <T> T proxy(int refId, Class<T> interfaceClass) {
         if (!interfaceClass.isInterface()) {
@@ -792,6 +792,10 @@ public class PythonEmbed implements AutoCloseable {
 
     boolean isOpen() {
         return processManager.isRunning();
+    }
+
+    boolean hasActiveHandles() {
+        return !handles.isEmpty();
     }
 
     long getPid() {

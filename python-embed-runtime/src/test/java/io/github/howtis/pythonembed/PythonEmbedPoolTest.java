@@ -1328,6 +1328,95 @@ class PythonEmbedPoolTest {
         assertTrue(ex.getCause().getMessage().contains("NameError"));
     }
 
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void hasActiveHandles_refCountsHandle() throws Exception {
+        // Set up the variable on all instances
+        for (int i = 0; i < pool.size(); i++) {
+            pool.exec("h_test = 'active'").get(3, TimeUnit.SECONDS);
+        }
+        PythonHandle handle = pool.ref("h_test").get(3, TimeUnit.SECONDS);
+        assertNotNull(handle);
+        // While handle is alive, the owning embed must have active handles
+        PythonEmbed embed = handle.owner();
+        assertTrue(embed.hasActiveHandles());
+
+        handle.release();
+        // After release, no active handles remain
+        assertFalse(embed.hasActiveHandles());
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void ref_handleSurvivesIdleCleanup() throws Exception {
+        PythonEmbedPool dynPool = PythonEmbedPool.builder().minPool(1).maxPool(3).idleTimeoutMs(0).build();
+        try {
+            assertEquals(1, dynPool.size());
+
+            // Scale up to have extra idle instances
+            CompletableFuture<?>[] tasks = new CompletableFuture[3];
+            for (int i = 0; i < 3; i++) {
+                tasks[i] = dynPool.eval("42");
+            }
+            CompletableFuture.allOf(tasks).get(10, TimeUnit.SECONDS);
+            int afterScaleUp = dynPool.size();
+            assertTrue(afterScaleUp >= 2, "Pool should have scaled up");
+
+            // Set up a variable on all instances
+            for (int i = 0; i < afterScaleUp; i++) {
+                dynPool.exec("sv = 'survive'").get(3, TimeUnit.SECONDS);
+            }
+
+            // Create a handle — this should pin its owning instance
+            PythonHandle handle = dynPool.ref("sv").get(3, TimeUnit.SECONDS);
+            assertNotNull(handle);
+
+            // Run idle cleanup — handle's instance should survive
+            dynPool.runMaintenance();
+
+            // The handle should still be usable (not invalidated by cleanup)
+            assertEquals("str", handle.pythonType());
+
+            handle.release();
+        } finally {
+            dynPool.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void ref_releasedHandle_cleanedUpNormally() throws Exception {
+        PythonEmbedPool dynPool = PythonEmbedPool.builder().minPool(1).maxPool(3).idleTimeoutMs(0).build();
+        try {
+            assertEquals(1, dynPool.size());
+
+            // Scale up to have extra idle instances
+            CompletableFuture<?>[] tasks = new CompletableFuture[3];
+            for (int i = 0; i < 3; i++) {
+                tasks[i] = dynPool.eval("42");
+            }
+            CompletableFuture.allOf(tasks).get(10, TimeUnit.SECONDS);
+            int afterScaleUp = dynPool.size();
+            assertTrue(afterScaleUp >= 2, "Pool should have scaled up");
+
+            // Set up a variable on all instances
+            for (int i = 0; i < afterScaleUp; i++) {
+                dynPool.exec("rn = 'normal'").get(3, TimeUnit.SECONDS);
+            }
+
+            // Create and immediately release a handle
+            PythonHandle handle = dynPool.ref("rn").get(3, TimeUnit.SECONDS);
+            handle.release();
+
+            // After release, idle cleanup should remove the extra instance
+            dynPool.runMaintenance();
+
+            assertEquals(1, dynPool.size(), "Released handle should allow idle cleanup");
+        } finally {
+            dynPool.close();
+        }
+    }
+
     // ---- proxy shortcut ----
 
     @Test
