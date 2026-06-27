@@ -949,6 +949,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#advanced-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1404,6 +1415,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#advanced-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1478,6 +1500,16 @@
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="s">&quot;numpy.linspace(0, 10, 2): &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="na">asList</span><span class="p">());</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">}</span>
 </code></pre></div>
+<h2 id="advanced-configuration">Advanced Configuration</h2>
+<p>The example <code>pom.xml</code> includes commented-out examples of advanced settings:</p>
+<ul>
+<li><strong>Cross-compilation</strong>: Use <code>&lt;targetOs&gt;</code> to build Python for a different OS (e.g., <code>windows</code>, <code>linux</code>, <code>macos</code>)</li>
+<li><strong>Custom pip index</strong>: Use <code>&lt;pipIndexUrl&gt;</code> to install from a custom package index (e.g., PyTorch CUDA)</li>
+<li><strong>Extra pip arguments</strong>: Use <code>&lt;pipExtraArgs&gt;</code> for flags like <code>--extra-index-url</code></li>
+<li><strong>pyproject.toml</strong>: Use <code>&lt;pyprojectTomlFile&gt;</code> to install dependencies from a <code>pyproject.toml</code></li>
+<li><strong>Python version</strong>: Use <code>&lt;pythonVersion&gt;</code> to specify the standalone Python version</li>
+<li><strong>requirements.txt</strong>: Use <code>&lt;requirementsFile&gt;</code> to load dependencies from <code>requirements.txt</code></li>
+</ul>
 <p>See <a href="../../installation/">Installation</a> for detailed Maven configuration.</p>
 
 
