@@ -1367,11 +1367,11 @@ class PythonEmbedPoolTest {
                 dynPool.exec("sv = 'survive'").get(3, TimeUnit.SECONDS);
             }
 
-            // Create a handle — this should pin its owning instance
+            // Create a handle -- this should pin its owning instance
             PythonHandle handle = dynPool.ref("sv").get(3, TimeUnit.SECONDS);
             assertNotNull(handle);
 
-            // Run idle cleanup — handle's instance should survive
+            // Run idle cleanup -- handle's instance should survive
             dynPool.runMaintenance();
 
             // The handle should still be usable (not invalidated by cleanup)
