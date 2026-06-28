@@ -1,8 +1,10 @@
 package io.github.howtis.pythonembed;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PythonEmbedOptionsTest {
@@ -168,13 +171,12 @@ class PythonEmbedOptionsTest {
     // ---- venvPath ----
 
     @Test
-    void builder_venvPath_setsValue() {
-        Path path = Path.of("/opt/venv");
+    void builder_venvPath_setsValue(@TempDir Path tempDir) {
         PythonEmbed.Options opts = PythonEmbed.Options.builder()
-                .venvPath(path)
+                .venvPath(tempDir)
                 .build();
 
-        assertEquals(path, opts.venvPath());
+        assertEquals(tempDir, opts.venvPath());
     }
 
     @Test
@@ -267,6 +269,59 @@ class PythonEmbedOptionsTest {
         assertTrue(opts.afterCloseHooks().isEmpty());
     }
 
+    // ---- build() validation ----
+
+    @Test
+    void build_pythonExecutable_blank_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().pythonExecutable("").build());
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().pythonExecutable("   ").build());
+    }
+
+    @Test
+    void build_venvPath_nonexistent_throws() {
+        Path nonexistent = Path.of("/nonexistent/venv/path");
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().venvPath(nonexistent).build());
+    }
+
+    @Test
+    void build_env_null_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().env(null).build());
+    }
+
+    @Test
+    void warmupScript_null_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().warmupScript(null));
+    }
+
+    @Test
+    void warmupScripts_null_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().warmupScripts(null));
+    }
+
+    @Test
+    void warmupScripts_nullElement_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().warmupScripts(Arrays.asList("import math", null)));
+    }
+
+    @Test
+    void onBeforeClose_null_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().onBeforeClose(null));
+    }
+
+    @Test
+    void onAfterClose_null_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder().onAfterClose(null));
+    }
+
     // ---- build() immutability ----
 
     @Test
@@ -296,7 +351,7 @@ class PythonEmbedOptionsTest {
     // ---- Builder chainability ----
 
     @Test
-    void builder_isChainable() {
+    void builder_isChainable(@TempDir Path tempDir) {
         PythonEmbed.Options opts = PythonEmbed.Options.builder()
                 .timeoutMs(60_000)
                 .maxCodeLength(50_000)
@@ -305,7 +360,7 @@ class PythonEmbedOptionsTest {
                 .warmupScript("import math")
                 .warmupScripts(List.of("import json"))
                 .lenientWarmup(false)
-                .venvPath(Path.of("/opt/venv"))
+                .venvPath(tempDir)
                 .env(Map.of("KEY", "VAL"))
                 .onBeforeClose((embed, reason) -> {})
                 .onAfterClose((embed, reason) -> {})
@@ -317,7 +372,7 @@ class PythonEmbedOptionsTest {
         assertEquals("/usr/bin/python3", opts.pythonExecutable());
         assertEquals(List.of("import math", "import json"), opts.warmupScripts());
         assertFalse(opts.lenientWarmup());
-        assertEquals(Path.of("/opt/venv"), opts.venvPath());
+        assertEquals(tempDir, opts.venvPath());
         assertEquals(Map.of("KEY", "VAL"), opts.env());
         assertEquals(1, opts.beforeCloseHooks().size());
         assertEquals(1, opts.afterCloseHooks().size());

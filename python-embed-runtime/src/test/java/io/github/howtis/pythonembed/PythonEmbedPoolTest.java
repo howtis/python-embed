@@ -632,6 +632,12 @@ class PythonEmbedPoolTest {
         assertThrows(IllegalArgumentException.class, () -> PythonEmbedPool.builder().minPool(3).maxPool(2).build());
     }
 
+    @Test
+    void options_mustNotBeNull() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbedPool.builder().options(null).build());
+    }
+
     // ------------------------------------------------------------------
     // Options.Builder validation
     // ------------------------------------------------------------------

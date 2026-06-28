@@ -267,8 +267,8 @@ class PythonEmbedIntegrationTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void options_withExplicitVenvPath() {
-        // Test that builder with a non-existent venv path throws PythonExecutionException
-        assertThrows(PythonExecutionException.class, () -> PythonEmbed.create(
+        // Test that builder with a non-existent venv path fails fast
+        assertThrows(IllegalArgumentException.class, () -> PythonEmbed.create(
                 PythonEmbed.Options.builder()
                         .venvPath(Path.of("/nonexistent/venv"))
                         .build()));

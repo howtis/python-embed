@@ -1339,12 +1339,23 @@ public class PythonEmbed implements AutoCloseable {
 
             /** Append a warmup script to execute after instance initialization. */
             public Builder warmupScript(String script) {
+                if (script == null) {
+                    throw new IllegalArgumentException("warmupScript must not be null");
+                }
                 this.warmupScripts.add(script);
                 return this;
             }
 
             /** Append multiple warmup scripts at once. */
             public Builder warmupScripts(List<String> scripts) {
+                if (scripts == null) {
+                    throw new IllegalArgumentException("warmupScripts must not be null");
+                }
+                for (String s : scripts) {
+                    if (s == null) {
+                        throw new IllegalArgumentException("warmup script must not be null");
+                    }
+                }
                 this.warmupScripts.addAll(scripts);
                 return this;
             }
@@ -1375,6 +1386,9 @@ public class PythonEmbed implements AutoCloseable {
              * Multiple hooks may be registered and will be called in order.
              */
             public Builder onBeforeClose(CloseHook hook) {
+                if (hook == null) {
+                    throw new IllegalArgumentException("close hook must not be null");
+                }
                 this.beforeCloseHooks.add(hook);
                 return this;
             }
@@ -1384,6 +1398,9 @@ public class PythonEmbed implements AutoCloseable {
              * Multiple hooks may be registered and will be called in order.
              */
             public Builder onAfterClose(CloseHook hook) {
+                if (hook == null) {
+                    throw new IllegalArgumentException("close hook must not be null");
+                }
                 this.afterCloseHooks.add(hook);
                 return this;
             }
@@ -1393,7 +1410,9 @@ public class PythonEmbed implements AutoCloseable {
              *
              * @return a new {@link Options} instance
              * @throws IllegalArgumentException if {@code timeoutMs <= 0},
-             *         {@code maxCodeLength <= 0}, or {@code startupTimeoutMs <= 0}
+             *         {@code maxCodeLength <= 0}, or {@code startupTimeoutMs <= 0},
+             *         or {@code pythonExecutable} is blank, or {@code venvPath}
+             *         does not exist or is not a directory, or {@code env} is null
              */
             public Options build() {
                 if (timeoutMs <= 0) {
@@ -1404,6 +1423,16 @@ public class PythonEmbed implements AutoCloseable {
                 }
                 if (startupTimeoutMs <= 0) {
                     throw new IllegalArgumentException("startupTimeoutMs must be positive");
+                }
+                if (pythonExecutable != null && pythonExecutable.isBlank()) {
+                    throw new IllegalArgumentException("pythonExecutable must not be blank");
+                }
+                if (venvPath != null && !java.nio.file.Files.isDirectory(venvPath)) {
+                    throw new IllegalArgumentException(
+                            "venvPath does not exist or is not a directory: " + venvPath);
+                }
+                if (env == null) {
+                    throw new IllegalArgumentException("env must not be null");
                 }
                 return new Options(timeoutMs,
                         maxCodeLength, startupTimeoutMs, pythonExecutable,

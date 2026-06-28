@@ -102,27 +102,22 @@ class PythonEmbedExplicitPathTest {
     }
 
     @Test
-    void create_nonexistentPath_throwsPythonExecutionException() {
+    void build_nonexistentVenvPath_throwsIllegalArgumentException() {
         Path nonexistent = Path.of("/nonexistent/python-embed-venv-" + System.nanoTime());
-        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
-                () -> PythonEmbed.create(
-                        PythonEmbed.Options.builder()
-                                .venvPath(nonexistent).build()));
-        assertTrue(ex.getCause() instanceof IOException);
-        assertTrue(ex.getCause().getMessage().contains("does not exist"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder()
+                        .venvPath(nonexistent).build());
+        assertTrue(ex.getMessage().contains("does not exist") || ex.getMessage().contains("not a directory"));
     }
 
     @Test
-    void create_pathIsFile_throwsPythonExecutionException(@TempDir Path tempDir) throws Exception {
+    void build_venvPathIsFile_throwsIllegalArgumentException(@TempDir Path tempDir) throws Exception {
         Path aFile = tempDir.resolve("not-a-directory.txt");
         Files.createFile(aFile);
-        PythonExecutionException ex = assertThrows(PythonExecutionException.class,
-                () -> PythonEmbed.create(
-                        PythonEmbed.Options.builder()
-                                .venvPath(aFile).build()));
-        assertTrue(ex.getCause() instanceof IOException);
-        assertTrue(ex.getCause().getMessage().contains("does not exist")
-                || ex.getCause().getMessage().contains("not a directory"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PythonEmbed.Options.builder()
+                        .venvPath(aFile).build());
+        assertTrue(ex.getMessage().contains("does not exist") || ex.getMessage().contains("not a directory"));
     }
 
     // ------------------------------------------------------------------

@@ -189,6 +189,9 @@ public class PythonEmbedPool implements AutoCloseable {
         if (b.healthCheckIntervalMs < 0) {
             throw new IllegalArgumentException("healthCheckIntervalMs must be >= 0");
         }
+        if (b.options == null) {
+            throw new IllegalArgumentException("options must not be null");
+        }
 
         this.minPool = b.minPool;
         this.maxPool = b.maxPool;

@@ -2,6 +2,7 @@ package io.github.howtis.pythonembed.spring;
 
 import io.github.howtis.pythonembed.PythonEmbed;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
@@ -32,10 +33,10 @@ class PythonEmbedOptionsBuildTest {
     }
 
     @Test
-    void venvPathSetToCustomPath() {
-        var props = bind(Map.of("python-embed.venv-path", "/opt/custom-venv"));
+    void venvPathSetToCustomPath(@TempDir Path tempDir) {
+        var props = bind(Map.of("python-embed.venv-path", tempDir.toString()));
         var options = PythonEmbedAutoConfiguration.buildOptions(props);
-        assertThat(options.venvPath()).isEqualTo(Path.of("/opt/custom-venv"));
+        assertThat(options.venvPath()).isEqualTo(tempDir);
     }
 
     @Test
