@@ -12,6 +12,16 @@ updates:
       - "dependencies"
     assignees:
       - "howtis"
+    groups:
+      patch:
+        update-types:
+          - "patch"
+      minor:
+        update-types:
+          - "minor"
+      major:
+        update-types:
+          - "major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -25,3 +35,7 @@ updates:
       - "ci"
     assignees:
       - "howtis"
+    groups:
+      actions:
+        patterns:
+          - "*"
