@@ -33,7 +33,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run tests
-        run: ./gradlew test jacocoTestReport
+        run: ./gradlew test jacocoTestReport --refresh-dependencies
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
