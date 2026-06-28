@@ -182,6 +182,11 @@ class PythonProcessManager {
         running = false;
         if (process != null && process.isAlive()) {
             process.destroyForcibly();
+            try {
+                process.waitFor(2, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         protocol.cancelAll(new RuntimeException("Python process terminated (JVM shutdown)"));
     }
