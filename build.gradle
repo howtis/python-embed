@@ -14,6 +14,7 @@ subprojects {
     group = rootProject.group
 
     apply plugin: 'java'
+    apply plugin: 'jacoco'
     apply plugin: 'com.vanniktech.maven.publish'
 
     repositories {
