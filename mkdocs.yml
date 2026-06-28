@@ -1,10 +1,19 @@
 site_name: PythonEmbed
-site_description: Run Python code from Java — with full CPython compatibility and zero setup
+site_description: Run Python code from Java — embed CPython in JVM apps via subprocess & MessagePack. Full numpy/scipy/torch support.
 site_url: https://howtis.github.io/python-embed
 repo_url: https://github.com/howtis/python-embed
 repo_name: howtis/python-embed
 
 docs_dir: docs
+
+site_author: howtis
+
+copyright: Copyright &copy; 2026 howtis
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/howtis/python-embed
 
 theme:
   name: material
