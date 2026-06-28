@@ -61,7 +61,7 @@ tasks.register('runAllExamples') {
             def theMainClass = mainClass
             def theClasspath = subproject.sourceSets.main.runtimeClasspath
             try {
-                project.javaexec {
+                services.get(org.gradle.process.ExecOperations).javaexec {
                     it.workingDir = subproject.projectDir
                     it.classpath = theClasspath
                     it.mainClass.set(theMainClass)
