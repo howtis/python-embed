@@ -6,7 +6,7 @@ version = project.findProperty('releaseVersion') ?: '1.0.2'
 dependencies {
     implementation project(':python-embed-runtime')
 
-    def springBootVersion = '3.3.5'
+    def springBootVersion = '4.1.0'
     implementation platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
     annotationProcessor platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
     compileOnly platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
