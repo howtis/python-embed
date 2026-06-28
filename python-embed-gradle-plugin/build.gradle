@@ -41,7 +41,7 @@ dependencies {
     implementation gradleApi()
     implementation "io.github.howtis:python-embed-build-common:${project.findProperty('releaseVersion') ?: '1.0.2'}"
 
-    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation platform('org.junit:junit-bom:6.1.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
