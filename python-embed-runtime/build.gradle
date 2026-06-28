@@ -5,7 +5,7 @@ plugins {
 version = project.findProperty('releaseVersion') ?: '1.0.2-SNAPSHOT'
 
 dependencies {
-    implementation 'org.msgpack:msgpack-core:0.9.8'
+    implementation 'org.msgpack:msgpack-core:0.9.12'
     implementation 'org.slf4j:slf4j-api:2.0.16'
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
