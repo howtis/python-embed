@@ -3,7 +3,6 @@ package io.github.howtis.pythonembed.spring;
 import io.github.howtis.pythonembed.PythonEmbed;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -38,8 +37,8 @@ class PythonEmbedIntegrationTest {
     @Test
     void healthIndicatorReportsUp() {
         assertThat(healthIndicator).isNotNull();
-        var health = healthIndicator.health();
-        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        var data = healthIndicator.health();
+        assertThat(data.up()).isTrue();
     }
 
     @Test

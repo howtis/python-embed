@@ -41,9 +41,6 @@ class PythonEmbedAutoConfigurationTest {
 
     @Test
     void contextLoadsInSingleMode() {
-        // Mock beans prevent real PythonEmbed/PythonEmbedPool creation
-        // (real creation would fail without Python installed).
-        // The context should load without errors.
         contextRunner
                 .withUserConfiguration(MockConfig.class)
                 .withPropertyValues("python-embed.mode=SINGLE")
@@ -70,8 +67,8 @@ class PythonEmbedAutoConfigurationTest {
                 .withUserConfiguration(MockConfig.class)
                 .withPropertyValues("python-embed.mode=SINGLE")
                 .run(ctx -> {
-                    // Actuator IS on test classpath (spring-boot-starter-actuator)
                     assertThat(ctx.containsBean("pythonEmbedHealthIndicator")).isTrue();
+                    assertThat(ctx.containsBean("healthIndicatorAdapter")).isTrue();
                 });
     }
 
@@ -82,6 +79,7 @@ class PythonEmbedAutoConfigurationTest {
                 .withPropertyValues("python-embed.mode=POOL")
                 .run(ctx -> {
                     assertThat(ctx.containsBean("pythonEmbedPoolHealthIndicator")).isTrue();
+                    assertThat(ctx.containsBean("healthIndicatorPoolAdapter")).isTrue();
                 });
     }
 
@@ -119,16 +117,11 @@ class PythonEmbedAutoConfigurationTest {
 
     @Test
     void userProvidedHealthIndicatorOverridesSingleMode() {
-        // Mockito cannot mock sealed PythonEmbedHealthIndicator directly;
-        // use the concrete Single subclass (this still satisfies @ConditionalOnMissingBean)
         contextRunner
                 .withUserConfiguration(MockConfig.class, UserHealthIndicatorConfig.class)
                 .withPropertyValues("python-embed.mode=SINGLE")
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
-                    // When a user provides their own indicator, the auto-configured one is skipped.
-                    // Here we get the single bean; it should be the user's config bean, not
-                    // the auto-configured one (which would use a different constructor).
                     var bean = ctx.getBean(PythonEmbedHealthIndicator.class);
                     assertThat(bean).isNotNull();
                 });
@@ -151,7 +144,6 @@ class PythonEmbedAutoConfigurationTest {
         @Bean
         @Primary
         PythonEmbedHealthIndicator customHealthIndicator() {
-            // Use concrete subclass — sealed PythonEmbedHealthIndicator cannot be mocked
             return new PythonEmbedHealthIndicator.Single(mock(PythonEmbed.class));
         }
     }

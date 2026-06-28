@@ -146,25 +146,54 @@ public class PythonEmbedAutoConfiguration {
     }
 
     // ------------------------------------------------------------------
-    // HealthIndicator (auto-detected when Actuator is on classpath)
+    // HealthIndicator — Boot 3.x (Actuator on classpath)
     // ------------------------------------------------------------------
 
-    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    @Bean
     @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
-    static class HealthIndicatorConfiguration {
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "SINGLE", matchIfMissing = true)
+    PythonEmbedHealthIndicator pythonEmbedHealthIndicator(PythonEmbed embed) {
+        return new PythonEmbedHealthIndicator.Single(embed);
+    }
 
-        @Bean
-        @ConditionalOnMissingBean
-        @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "SINGLE", matchIfMissing = true)
-        PythonEmbedHealthIndicator pythonEmbedHealthIndicator(PythonEmbed embed) {
-            return new PythonEmbedHealthIndicator.Single(embed);
-        }
+    @Bean
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "POOL")
+    PythonEmbedHealthIndicator pythonEmbedPoolHealthIndicator(PythonEmbedPool pool) {
+        return new PythonEmbedHealthIndicator.Pool(pool);
+    }
 
-        @Bean
-        @ConditionalOnMissingBean
-        @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "POOL")
-        PythonEmbedHealthIndicator pythonEmbedPoolHealthIndicator(PythonEmbedPool pool) {
-            return new PythonEmbedHealthIndicator.Pool(pool);
-        }
+    @Bean
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "SINGLE", matchIfMissing = true)
+    HealthIndicatorAdapter healthIndicatorAdapter(PythonEmbed embed) {
+        return new HealthIndicatorAdapter(new PythonEmbedHealthIndicator.Single(embed));
+    }
+
+    @Bean
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "POOL")
+    HealthIndicatorAdapter healthIndicatorPoolAdapter(PythonEmbedPool pool) {
+        return new HealthIndicatorAdapter(new PythonEmbedHealthIndicator.Pool(pool));
+    }
+
+    // ------------------------------------------------------------------
+    // HealthIndicator — Boot 4.x (HealthContributor on classpath)
+    // ------------------------------------------------------------------
+
+    @Bean("pythonEmbedHealthIndicatorV4")
+    @ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "SINGLE", matchIfMissing = true)
+    Object healthIndicatorV4(PythonEmbed embed) {
+        return HealthIndicatorV4Adapter.create(new PythonEmbedHealthIndicator.Single(embed));
+    }
+
+    @Bean("pythonEmbedPoolHealthIndicatorV4")
+    @ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
+    @ConditionalOnProperty(prefix = "python-embed", name = "mode", havingValue = "POOL")
+    Object healthIndicatorPoolV4(PythonEmbedPool pool) {
+        return HealthIndicatorV4Adapter.create(new PythonEmbedHealthIndicator.Pool(pool));
     }
 }

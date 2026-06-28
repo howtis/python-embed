@@ -5,7 +5,6 @@ import io.github.howtis.pythonembed.PythonEmbed;
 import io.github.howtis.pythonembed.PythonEmbedPool;
 import io.github.howtis.pythonembed.PythonExecutionException;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Status;
 
 import java.util.List;
 
@@ -21,13 +20,14 @@ class PythonEmbedHealthIndicatorTest {
         when(embed.health()).thenReturn(new HealthInfo(1024, 0, true, List.of(1, 2, 3)));
 
         var indicator = new PythonEmbedHealthIndicator.Single(embed);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.UP);
-        assertThat(health.getDetails()).containsEntry("memoryRssKb", 1024L);
-        assertThat(health.getDetails()).containsEntry("refCount", 0);
-        assertThat(health.getDetails()).containsEntry("gcEnabled", true);
-        assertThat(health.getDetails()).containsEntry("gcCounts", List.of(1, 2, 3));
+        assertThat(data.up()).isTrue();
+        assertThat(data.error()).isNull();
+        assertThat(data.details()).containsEntry("memoryRssKb", 1024L);
+        assertThat(data.details()).containsEntry("refCount", 0);
+        assertThat(data.details()).containsEntry("gcEnabled", true);
+        assertThat(data.details()).containsEntry("gcCounts", List.of(1, 2, 3));
     }
 
     @Test
@@ -36,9 +36,11 @@ class PythonEmbedHealthIndicatorTest {
         when(embed.health()).thenThrow(new PythonExecutionException("test failure"));
 
         var indicator = new PythonEmbedHealthIndicator.Single(embed);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(data.up()).isFalse();
+        assertThat(data.error()).isNotNull();
+        assertThat(data.error().getMessage()).contains("test failure");
     }
 
     @Test
@@ -49,12 +51,12 @@ class PythonEmbedHealthIndicatorTest {
         when(pool.activeCount()).thenReturn(1);
 
         var indicator = new PythonEmbedHealthIndicator.Pool(pool);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.UP);
-        assertThat(health.getDetails()).containsEntry("size", 2);
-        assertThat(health.getDetails()).containsEntry("minPool", 2);
-        assertThat(health.getDetails()).containsEntry("activeCount", 1);
+        assertThat(data.up()).isTrue();
+        assertThat(data.details()).containsEntry("size", 2);
+        assertThat(data.details()).containsEntry("minPool", 2);
+        assertThat(data.details()).containsEntry("activeCount", 1);
     }
 
     @Test
@@ -65,9 +67,9 @@ class PythonEmbedHealthIndicatorTest {
         when(pool.activeCount()).thenReturn(0);
 
         var indicator = new PythonEmbedHealthIndicator.Pool(pool);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(data.up()).isFalse();
     }
 
     @Test
@@ -78,9 +80,9 @@ class PythonEmbedHealthIndicatorTest {
         when(pool.activeCount()).thenReturn(3);
 
         var indicator = new PythonEmbedHealthIndicator.Pool(pool);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(data.up()).isTrue();
     }
 
     @Test
@@ -89,8 +91,9 @@ class PythonEmbedHealthIndicatorTest {
         when(pool.size()).thenThrow(new RuntimeException("pool unavailable"));
 
         var indicator = new PythonEmbedHealthIndicator.Pool(pool);
-        var health = indicator.health();
+        var data = indicator.health();
 
-        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(data.up()).isFalse();
+        assertThat(data.error()).isNotNull();
     }
 }
