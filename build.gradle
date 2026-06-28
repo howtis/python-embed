@@ -84,3 +84,9 @@ subprojects {
         }
     }
 }
+
+tasks.named('test') {
+    dependsOn gradle.includedBuild('python-embed-build-common').task(':test')
+    dependsOn gradle.includedBuild('python-embed-gradle-plugin').task(':test')
+    dependsOn gradle.includedBuild('python-embed-maven-plugin').task(':test')
+}
