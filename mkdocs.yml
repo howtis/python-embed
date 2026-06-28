@@ -26,6 +26,12 @@ theme:
     - search.highlight
     - content.code.copy
 
+plugins:
+  - social:
+      cards_layout_options:
+        font_family: Inter
+  - search
+
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
@@ -71,3 +77,5 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
