@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'com.vanniktech.maven.publish' version '0.34.0'
 }
 
@@ -71,5 +72,14 @@ subprojects {
         systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
         systemProperty 'junit.jupiter.execution.parallel.mode.default', 'same_thread'
         systemProperty 'junit.jupiter.execution.parallel.mode.classes.default', 'concurrent'
+        finalizedBy(tasks.matching { it.name == 'jacocoTestReport' })
+    }
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            xml.required = true
+            html.required = true
+        }
     }
 }
