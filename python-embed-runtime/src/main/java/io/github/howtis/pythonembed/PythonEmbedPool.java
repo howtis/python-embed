@@ -80,6 +80,7 @@ public class PythonEmbedPool implements AutoCloseable {
     private final Condition instanceAvailable = instanceLock.newCondition();
     private volatile long lastHealthCheckAt;
     private volatile boolean closed;
+    private final long createdAt;
 
     private final Map<String, CallbackHandler> callbackHandlers = new ConcurrentHashMap<>();
     private final Map<String, PushHandler> pushHandlers = new ConcurrentHashMap<>();
@@ -195,6 +196,7 @@ public class PythonEmbedPool implements AutoCloseable {
         this.healthCheckIntervalMs = b.healthCheckIntervalMs;
         this.options = b.options;
         this.onInstanceRemoved = b.onInstanceRemoved;
+        this.createdAt = System.currentTimeMillis();
 
         this.instances = new ConcurrentLinkedDeque<>();
         this.currentSize = new AtomicInteger(0);
@@ -779,6 +781,27 @@ public class PythonEmbedPool implements AutoCloseable {
      */
     public int maxPool() {
         return maxPool;
+    }
+
+    /**
+     * Returns a point-in-time snapshot of pool metrics.
+     *
+     * <p>The returned {@link PoolMetrics} reflects the pool's state
+     * at the moment of the call. Values may change immediately afterward
+     * due to concurrent activity.
+     *
+     * @return a snapshot of current pool metrics
+     */
+    public PoolMetrics metrics() {
+        int size = size();
+        int active = activeCount();
+        return new PoolMetrics(
+                size,
+                active,
+                size - active,
+                minPool,
+                maxPool,
+                System.currentTimeMillis() - createdAt);
     }
 
     // ------------------------------------------------------------------

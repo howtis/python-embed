@@ -1694,6 +1694,121 @@ class PythonEmbedPoolTest {
                 "close(0, SECONDS) should return quickly, elapsed=" + elapsed + "ms");
     }
 
+    // ---- D4: Pool Metrics ----
+
+    @Test
+    void metrics_snapshotAfterBuild() throws Exception {
+        PythonEmbedPool pool = PythonEmbedPool.builder().minPool(2).maxPool(4).build();
+        try {
+            waitForPoolSize(pool, 2, 5000);
+
+            PoolMetrics m = pool.metrics();
+            assertEquals(2, m.poolSize());
+            assertEquals(0, m.activeCount());
+            assertEquals(2, m.idleCount());
+            assertEquals(2, m.minPool());
+            assertEquals(4, m.maxPool());
+            assertTrue(m.uptimeMs() >= 0, "uptimeMs should be non-negative");
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void metrics_idleCount_reflectsBusyInstances() throws Exception {
+        PythonEmbedPool pool = PythonEmbedPool.builder().maxPool(2).build();
+        try {
+            // Use exec instead of eval because Python eval() does not
+            // allow statement-level constructs like import + sleep.
+            CompletableFuture<Void> task = pool.exec(
+                    "import time; time.sleep(3)");
+
+            // Poll until the task is acquired and instance becomes busy
+            long deadline = System.currentTimeMillis() + 5000;
+            while (pool.activeCount() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50);
+            }
+
+            PoolMetrics m = pool.metrics();
+            assertEquals(1, m.poolSize());
+            assertEquals(1, m.activeCount(), "Instance should be busy while task runs");
+            assertEquals(0, m.idleCount());
+
+            task.get(10, TimeUnit.SECONDS);
+
+            // Poll until instance is released
+            deadline = System.currentTimeMillis() + 5000;
+            while (pool.activeCount() > 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50);
+            }
+            m = pool.metrics();
+            assertEquals(1, m.poolSize());
+            assertEquals(0, m.activeCount(), "Instance should be idle after task completes");
+            assertEquals(1, m.idleCount());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void metrics_idleCount_afterScaleUp() throws Exception {
+        PythonEmbedPool pool = PythonEmbedPool.builder().minPool(1).maxPool(2).build();
+        try {
+            // Submit two long-running tasks to trigger scale-up
+            CompletableFuture<Void> t1 = pool.exec(
+                    "import time; time.sleep(3)");
+            // Poll until first task makes the instance busy
+            long deadline = System.currentTimeMillis() + 5000;
+            while (pool.activeCount() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50);
+            }
+            CompletableFuture<Void> t2 = pool.exec(
+                    "import time; time.sleep(3)");
+
+            waitForPoolSize(pool, 2, 5000);
+
+            PoolMetrics m = pool.metrics();
+            assertEquals(2, m.poolSize());
+            assertEquals(2, m.activeCount(),
+                    "Both instances should be busy during concurrent execution");
+            assertEquals(0, m.idleCount());
+
+            t1.get(10, TimeUnit.SECONDS);
+            t2.get(10, TimeUnit.SECONDS);
+
+            // Poll until both instances are released
+            deadline = System.currentTimeMillis() + 5000;
+            while (pool.activeCount() > 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50);
+            }
+            m = pool.metrics();
+            assertEquals(0, m.activeCount(),
+                    "All instances should be idle after tasks complete");
+            assertEquals(2, m.idleCount());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    void metrics_uptimeMs_increases() throws Exception {
+        PythonEmbedPool pool = PythonEmbedPool.builder().maxPool(1).build();
+        try {
+            PoolMetrics m1 = pool.metrics();
+            Thread.sleep(200);
+            PoolMetrics m2 = pool.metrics();
+
+            assertTrue(m2.uptimeMs() > m1.uptimeMs(),
+                    "uptimeMs should increase over time");
+            assertTrue(m2.uptimeMs() >= 200,
+                    "uptimeMs should be at least the sleep duration");
+        } finally {
+            pool.close();
+        }
+    }
+
     /**
      * Waits for the pool to reach the given size, polling every 100ms.
      */
