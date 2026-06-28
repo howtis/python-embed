@@ -5,7 +5,7 @@
 [![CI](https://github.com/howtis/python-embed/actions/workflows/ci.yml/badge.svg)](https://github.com/howtis/python-embed/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.howtis/python-embed-runtime)](https://central.sonatype.com/artifact/io.github.howtis/python-embed-runtime)
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.howtis.python-embed)](https://plugins.gradle.org/plugin/io.github.howtis.python-embed)
-[![codecov](https://codecov.io/gh/howtis/python-embed/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/howtis/python-embed)
+[![codecov](https://codecov.io/gh/howtis/python-embed/graph/badge.svg)](https://codecov.io/gh/howtis/python-embed)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Java에서 Python 코드를 실행하세요 — 완전한 CPython 호환성, 설정 불필요.
