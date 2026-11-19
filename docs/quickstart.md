@@ -10,7 +10,7 @@ Get PythonEmbed running in your project in 5 minutes.
 
     ```groovy
     plugins {
-        id 'io.github.howtis.python-embed' version '1.0.3'
+        id 'io.github.howtis.python-embed' version '1.0.4'
     }
 
     dependencies {
@@ -31,7 +31,7 @@ Get PythonEmbed running in your project in 5 minutes.
         <dependency>
             <groupId>io.github.howtis</groupId>
             <artifactId>python-embed-runtime</artifactId>
-            <version>1.0.3</version>
+            <version>1.0.4</version>
         </dependency>
     </dependencies>
 
@@ -40,7 +40,7 @@ Get PythonEmbed running in your project in 5 minutes.
             <plugin>
                 <groupId>io.github.howtis</groupId>
                 <artifactId>python-embed-maven-plugin</artifactId>
-                <version>1.0.3</version>
+                <version>1.0.4</version>
                 <executions>
                     <execution>
                         <goals><goal>setup</goal></goals>

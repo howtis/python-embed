@@ -2,9 +2,9 @@
 
 ## [1.0.6] - 2026-11-20
 
-- [python-embed-build-common](python-embed-build-common/CHANGELOG.md) (1.0.3) — download verification against `SHA256SUMS`, cached release metadata that survives the anonymous GitHub API limit, the move to `astral-sh/python-build-standalone`, and a `pythonVersion` that is actually honoured: system Python is used only when it matches, and the fingerprint records the version the venv runs
-- [python-embed-gradle-plugin](python-embed-gradle-plugin/CHANGELOG.md) (1.0.3) — embedded venvs are copied under `python-venv/` instead of being scattered at the JAR root; new `embedVenv` switch
-- [python-embed-maven-plugin](python-embed-maven-plugin/CHANGELOG.md) (1.0.3) — picks up build-common 1.0.3
+- [python-embed-build-common](python-embed-build-common/CHANGELOG.md) (1.0.4) — download verification against `SHA256SUMS`, cached release metadata that survives the anonymous GitHub API limit, the move to `astral-sh/python-build-standalone`, and a `pythonVersion` that is actually honoured: system Python is used only when it matches, and the fingerprint records the version the venv runs
+- [python-embed-gradle-plugin](python-embed-gradle-plugin/CHANGELOG.md) (1.0.4) — embedded venvs are copied under `python-venv/` instead of being scattered at the JAR root; new `embedVenv` switch
+- [python-embed-maven-plugin](python-embed-maven-plugin/CHANGELOG.md) (1.0.4) — picks up build-common 1.0.4
 - [python-embed-runtime](python-embed-runtime/CHANGELOG.md) (1.0.4) — JAR venv extraction works on Windows; the published JAR no longer ships a platform-specific venv
 
 ## [1.0.5] - 2026-06-27

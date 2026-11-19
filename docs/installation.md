@@ -8,7 +8,7 @@ Add the plugin to `build.gradle`:
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.3'
+    id 'io.github.howtis.python-embed' version '1.0.4'
 }
 
 dependencies {
@@ -84,7 +84,7 @@ Add the plugin to `pom.xml`:
     <plugin>
       <groupId>io.github.howtis</groupId>
       <artifactId>python-embed-maven-plugin</artifactId>
-      <version>1.0.3</version>
+      <version>1.0.4</version>
       <executions>
         <execution>
           <goals>

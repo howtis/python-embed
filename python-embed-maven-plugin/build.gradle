@@ -47,7 +47,7 @@ repositories {
 }
 
 dependencies {
-    implementation "io.github.howtis:python-embed-build-common:${project.findProperty('releaseVersion') ?: '1.0.2'}"
+    implementation "io.github.howtis:python-embed-build-common:${project.findProperty('buildCommonVersion') ?: '1.0.4'}"
     implementation 'org.apache.maven:maven-plugin-api:3.9.16'
     implementation 'org.apache.maven:maven-core:3.9.16'
     implementation 'org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.2'

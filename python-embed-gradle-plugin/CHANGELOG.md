@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.3] - 2026-11-20
+## [1.0.4] - 2026-11-20
 
 ### Added
 - `embedVenv` property (default `true`) to opt out of embedding the venv in the JAR

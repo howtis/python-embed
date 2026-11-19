@@ -22,7 +22,7 @@ PythonEmbed는 서브프로세스 + [MessagePack](https://msgpack.org/) 바이�
 
     ```groovy
     plugins {
-        id 'io.github.howtis.python-embed' version '1.0.3'
+        id 'io.github.howtis.python-embed' version '1.0.4'
     }
 
     pythonEmbed {
@@ -43,7 +43,7 @@ PythonEmbed는 서브프로세스 + [MessagePack](https://msgpack.org/) 바이�
         <dependency>
             <groupId>io.github.howtis</groupId>
             <artifactId>python-embed-runtime</artifactId>
-            <version>1.0.3</version>
+            <version>1.0.4</version>
         </dependency>
     </dependencies>
 
@@ -52,7 +52,7 @@ PythonEmbed는 서브프로세스 + [MessagePack](https://msgpack.org/) 바이�
             <plugin>
                 <groupId>io.github.howtis</groupId>
                 <artifactId>python-embed-maven-plugin</artifactId>
-                <version>1.0.3</version>
+                <version>1.0.4</version>
                 <executions>
                     <execution>
                         <goals><goal>setup</goal></goals>
