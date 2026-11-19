@@ -10,7 +10,7 @@ Add the Gradle plugin:
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.2'
+    id 'io.github.howtis.python-embed' version '1.0.3'
 }
 
 pythonEmbed {

@@ -22,7 +22,7 @@ PythonEmbed embeds a real CPython interpreter in your JVM application via a subp
 
     ```groovy
     plugins {
-        id 'io.github.howtis.python-embed' version '1.0.2'
+        id 'io.github.howtis.python-embed' version '1.0.3'
     }
 
     pythonEmbed {
@@ -30,7 +30,7 @@ PythonEmbed embeds a real CPython interpreter in your JVM application via a subp
     }
 
     dependencies {
-        implementation 'io.github.howtis:python-embed-runtime:1.0.3'
+        implementation 'io.github.howtis:python-embed-runtime:1.0.4'
     }
     ```
 
@@ -43,7 +43,7 @@ PythonEmbed embeds a real CPython interpreter in your JVM application via a subp
         <dependency>
             <groupId>io.github.howtis</groupId>
             <artifactId>python-embed-runtime</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.3</version>
         </dependency>
     </dependencies>
 
@@ -52,7 +52,7 @@ PythonEmbed embeds a real CPython interpreter in your JVM application via a subp
             <plugin>
                 <groupId>io.github.howtis</groupId>
                 <artifactId>python-embed-maven-plugin</artifactId>
-                <version>1.0.2</version>
+                <version>1.0.3</version>
                 <executions>
                     <execution>
                         <goals><goal>setup</goal></goals>

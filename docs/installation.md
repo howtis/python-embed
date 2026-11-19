@@ -8,11 +8,11 @@ Add the plugin to `build.gradle`:
 
 ```groovy
 plugins {
-    id 'io.github.howtis.python-embed' version '1.0.2'
+    id 'io.github.howtis.python-embed' version '1.0.3'
 }
 
 dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.3'
+    implementation 'io.github.howtis:python-embed-runtime:1.0.4'
 }
 ```
 
@@ -50,8 +50,13 @@ pythonEmbed {
 | `pipExtraArgs` | `List<String>` | `[]` | Extra pip install arguments (e.g., `-f`, `--extra-index-url`) |
 | `venvOutputDir` | `Directory` | `build/python-venv` | Output directory for the venv |
 | `targetOs` | `String` | auto-detected | Cross-compile for `windows`, `linux`, or `macos` |
+| `embedVenv` | `boolean` | `true` | Copy the venv into the JAR under `python-venv/`. Turn it off to keep the JAR portable across platforms |
 
 The venv is rebuilt incrementally — only when dependencies change.
+
+`pythonVersion` is a pin, not a hint: system Python is used only when it matches the requested version, otherwise python-build-standalone is downloaded. The venv records the version it actually runs, so changing `pythonVersion` rebuilds it.
+
+With `embedVenv = true` the venv is copied into your application JAR under `python-venv/` and extracted to a temp directory at startup, which assumes the build and runtime platforms match. The `python-embed` library JAR published to Maven Central carries no venv for that reason.
 
 ## Spring Boot Starter
 
@@ -79,7 +84,7 @@ Add the plugin to `pom.xml`:
     <plugin>
       <groupId>io.github.howtis</groupId>
       <artifactId>python-embed-maven-plugin</artifactId>
-      <version>1.0.2</version>
+      <version>1.0.3</version>
       <executions>
         <execution>
           <goals>

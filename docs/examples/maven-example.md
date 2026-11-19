@@ -16,7 +16,7 @@ Demonstrates how to use PythonEmbed with the Maven plugin (`python-embed-maven-p
     <dependency>
         <groupId>io.github.howtis</groupId>
         <artifactId>python-embed-runtime</artifactId>
-        <version>1.0.2</version>
+        <version>1.0.3</version>
     </dependency>
 </dependencies>
 
@@ -25,7 +25,7 @@ Demonstrates how to use PythonEmbed with the Maven plugin (`python-embed-maven-p
         <plugin>
             <groupId>io.github.howtis</groupId>
             <artifactId>python-embed-maven-plugin</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.3</version>
             <executions>
                 <execution>
                     <goals><goal>setup</goal></goals>

@@ -22,4 +22,8 @@ pythonEmbed {
     packages = [
         'msgpack'
     ]
+    // This module is the library published to Maven Central. A venv is specific
+    // to the platform it was built on, so it belongs in the consumer's build via
+    // the plugin, not in a portable JAR.
+    embedVenv = false
 }

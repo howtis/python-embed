@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.4] - 2026-11-20
+
+### Fixed
+- Extracting a venv from a JAR now works on Windows. The `file:/C:/...` URI inside a `jar:` URL was handed straight to the zip filesystem provider, which rejected it with "Path component should be '/'".
+- `PythonEmbed.create()` reports an actionable message when no venv can be found, naming the plugin and `Options.venvPath` instead of a bare "Resource not found on classpath: python-venv".
+
+### Changed
+- The published runtime JAR no longer carries a venv. A venv is specific to the platform it was built on, so the plugin provisions it in the consuming build, where the application JAR still embeds it.
+
 ## [1.0.3] - 2026-06-27
 
 ### Added

@@ -137,7 +137,14 @@ public class PythonEmbed implements AutoCloseable {
             venvPath = resolveFromProperties(props);
             if (venvPath == null) {
                 // Fall back to classpath resource extraction
-                venvPath = venvExtractor.extract(VENV_RESOURCE_PATH);
+                try {
+                    venvPath = venvExtractor.extract(VENV_RESOURCE_PATH);
+                } catch (IOException e) {
+                    throw new IOException("No Python environment found. Apply the "
+                            + "io.github.howtis.python-embed Gradle or Maven plugin to "
+                            + "provision one, or pass Options.builder().venvPath(...) "
+                            + "pointing at an existing venv.", e);
+                }
             }
         }
 

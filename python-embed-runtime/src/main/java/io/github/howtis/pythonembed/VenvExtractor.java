@@ -37,11 +37,22 @@ class VenvExtractor implements AutoCloseable {
      * @return the path to the extracted directory on the filesystem
      */
     Path extract(String resourcePath) throws IOException {
+        return extract(resourcePath, getClass().getClassLoader());
+    }
+
+    /**
+     * Extracts a classpath resource directory using the given class loader.
+     *
+     * @param resourcePath the resource directory path relative to classpath root
+     * @param loader the class loader to resolve the resource with
+     * @return the path to the extracted directory on the filesystem
+     */
+    Path extract(String resourcePath, ClassLoader loader) throws IOException {
         if (closed) {
             throw new IllegalStateException("VenvExtractor is closed");
         }
 
-        URL resourceUrl = getClass().getClassLoader().getResource(resourcePath);
+        URL resourceUrl = loader.getResource(resourcePath);
         if (resourceUrl == null) {
             throw new IOException("Resource not found on classpath: " + resourcePath);
         }
@@ -86,7 +97,11 @@ class VenvExtractor implements AutoCloseable {
         URI jarFileUri = URI.create(parts[0].replace("jar:", ""));
         String entryPrefix = parts[1].startsWith("/") ? parts[1].substring(1) : parts[1];
 
-        try (FileSystem jarFs = FileSystems.newFileSystem(jarFileUri, Collections.emptyMap())) {
+        // Convert through Path rather than handing the URI straight to
+        // FileSystems: a `file:/C:/...` URI is rejected by the Windows provider
+        // ("Path component should be '/'"), while Path.of accepts it.
+        Path jarPath = Path.of(jarFileUri);
+        try (FileSystem jarFs = FileSystems.newFileSystem(jarPath, Collections.emptyMap())) {
             Path jarRoot = jarFs.getPath(entryPrefix);
             if (!Files.exists(jarRoot)) {
                 throw new IOException("Path not found in JAR: " + entryPrefix);

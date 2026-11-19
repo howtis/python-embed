@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.3] - 2026-11-20
+
+### Changed
+- Depends on `python-embed-build-common` 1.0.3: download verification against `SHA256SUMS`, cached release metadata, and `pythonVersion` pinning for `python-embed:setup`.
+
 ## [1.0.2] - 2026-06-26
 
 ### Added
