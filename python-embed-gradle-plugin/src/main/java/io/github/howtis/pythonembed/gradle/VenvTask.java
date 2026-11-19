@@ -30,6 +30,8 @@ import java.util.logging.Logger;
  * <p>Delegates to {@link VenvManager} in {@code python-embed-build-common}
  * for the core venv setup logic.
  */
+@org.gradle.work.DisableCachingByDefault(because =
+        "A venv is specific to the machine and platform that built it, and records absolute paths")
 public abstract class VenvTask extends DefaultTask {
 
     private static final Logger logger = Logger.getLogger(VenvTask.class.getName());

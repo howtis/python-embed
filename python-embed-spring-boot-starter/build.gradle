@@ -23,3 +23,13 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// The published runtime JAR carries no venv (a venv belongs to the platform that
+// built it), so these tests borrow the one the runtime module builds and place it
+// where PythonEmbed looks for it on the classpath.
+def runtimeVenv = project(':python-embed-runtime').layout.buildDirectory.dir('python-venv')
+tasks.named('processTestResources', ProcessResources) {
+    dependsOn project(':python-embed-runtime').tasks.named('createVenv')
+    from(runtimeVenv) { into 'python-venv' }
+}
+

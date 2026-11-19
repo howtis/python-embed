@@ -137,6 +137,8 @@ public class PythonEmbedPlugin implements Plugin<Project> {
      * Generates {@code META-INF/python-embed.properties} with the venv path
      * and embedded flag for runtime discovery.
      */
+    @org.gradle.work.DisableCachingByDefault(because =
+            "Writes the absolute venv path, which is specific to the machine that built it")
     public static abstract class GeneratePropsTask extends DefaultTask {
 
         /**
@@ -145,6 +147,7 @@ public class PythonEmbedPlugin implements Plugin<Project> {
          * @return the venv directory
          */
         @org.gradle.api.tasks.InputDirectory
+        @org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.ABSOLUTE)
         public abstract DirectoryProperty getVenvDir();
 
         /**
@@ -154,6 +157,11 @@ public class PythonEmbedPlugin implements Plugin<Project> {
          */
         @org.gradle.api.tasks.Input
         public abstract Property<Boolean> getEmbedVenv();
+
+        /** Defaults {@code embedVenv} so the task can run outside the plugin wiring. */
+        public GeneratePropsTask() {
+            getEmbedVenv().convention(true);
+        }
 
         /**
          * Output directory for the properties file (under resources).
@@ -172,12 +180,13 @@ public class PythonEmbedPlugin implements Plugin<Project> {
             boolean embedded = getEmbedVenv().getOrElse(true)
                     && venvPath.startsWith(buildDirPath);
 
+            Path outputDir = getOutputDir().get().getAsFile().toPath();
+            Path outputFile = outputDir.resolve(PROPS_RESOURCE_PATH);
+
             Properties props = new Properties();
             props.setProperty(PROPS_KEY_VENV_PATH, venvPath.toString());
             props.setProperty(PROPS_KEY_VENV_EMBEDDED, String.valueOf(embedded));
 
-            Path outputDir = getOutputDir().get().getAsFile().toPath();
-            Path outputFile = outputDir.resolve(PROPS_RESOURCE_PATH);
             try {
                 Files.createDirectories(outputFile.getParent());
                 try (var writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
