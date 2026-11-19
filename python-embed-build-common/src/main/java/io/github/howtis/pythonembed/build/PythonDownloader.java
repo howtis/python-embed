@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -30,8 +31,13 @@ public final class PythonDownloader {
     private static final String USER_AGENT = "python-embed-build-common";
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_BASE_DELAY_MS = 2000;
+    private static final String REPOSITORY = "astral-sh/python-build-standalone";
     private static final String RELEASES_URL =
-            "https://api.github.com/repos/indygreg/python-build-standalone/releases";
+            "https://api.github.com/repos/" + REPOSITORY + "/releases";
+    private static final String DOWNLOAD_BASE =
+            "https://github.com/" + REPOSITORY + "/releases/download/";
+    private static final String METADATA_CACHE_FILE = "release-metadata.properties";
+    private static final String SHA256SUMS_FILE = "SHA256SUMS";
 
     private PythonDownloader() {
     }
@@ -51,34 +57,26 @@ public final class PythonDownloader {
     public static Path download(String version, String targetOs, Path cacheDir,
                                  Path outputDir, Consumer<String> logger) throws IOException {
         String targetTriple = detectTargetTriple(targetOs);
-        String releaseTag = fetchLatestReleaseTag(logger);
 
         Files.createDirectories(cacheDir);
 
-        String exactAsset = findMatchingAsset(releaseTag, version, targetTriple, logger);
-        Path archiveFile = cacheDir.resolve(exactAsset);
+        ReleaseMetadata metadata = resolveReleaseMetadata(cacheDir, logger);
+        String exactAsset = findMatchingAsset(metadata.assets(), version, targetTriple);
+        logger.accept("Found matching asset: " + exactAsset);
 
+        Path archiveFile = cacheDir.resolve(exactAsset);
+        boolean freshlyDownloaded = false;
         if (!Files.exists(archiveFile)) {
-            String downloadUrl = "https://github.com/indygreg/python-build-standalone"
-                    + "/releases/download/" + releaseTag + "/" + exactAsset;
+            String downloadUrl = DOWNLOAD_BASE + metadata.tag() + "/" + exactAsset;
             logger.accept("Downloading: " + downloadUrl);
             downloadFile(downloadUrl, archiveFile, logger);
+            freshlyDownloaded = true;
             logger.accept("Downloaded to: " + archiveFile);
-
-            Path shaFile = cacheDir.resolve(exactAsset + ".sha256");
-            downloadFile(downloadUrl + ".sha256", shaFile, logger);
-            String expectedHash = Files.readString(shaFile).trim().split("\\s+")[0];
-            String actualHash = computeFileSha256(archiveFile);
-            if (!expectedHash.equalsIgnoreCase(actualHash)) {
-                Files.deleteIfExists(archiveFile);
-                Files.deleteIfExists(shaFile);
-                throw new IOException("SHA256 mismatch for " + exactAsset
-                        + ": expected " + expectedHash + ", got " + actualHash);
-            }
-            logger.accept("SHA256 checksum verified: " + actualHash);
         } else {
             logger.accept("Using cached: " + archiveFile);
         }
+
+        verifyArchive(archiveFile, exactAsset, metadata.tag(), cacheDir, freshlyDownloaded, logger);
 
         // Clean output directory
         deleteRecursively(outputDir, logger);
@@ -120,7 +118,34 @@ public final class PythonDownloader {
         return PythonResolver.detectTargetTriple(targetOs, arch);
     }
 
-    private static String fetchLatestReleaseTag(Consumer<String> logger) throws IOException {
+    /**
+     * Resolves the latest python-build-standalone release, preferring the GitHub API
+     * and falling back to the on-disk metadata cache when the API is unavailable —
+     * for example when the anonymous limit of 60 requests per hour is exhausted.
+     *
+     * <p>A single request supplies both the tag and the asset list, so a build costs
+     * one API call rather than two.
+     */
+    static ReleaseMetadata resolveReleaseMetadata(Path cacheDir, Consumer<String> logger) throws IOException {
+        Path cacheFile = cacheDir.resolve(METADATA_CACHE_FILE);
+        try {
+            ReleaseMetadata fetched = fetchLatestRelease(logger);
+            writeReleaseMetadataCache(cacheFile, fetched);
+            return fetched;
+        } catch (IOException e) {
+            ReleaseMetadata cached = readReleaseMetadataCache(cacheFile);
+            if (cached != null) {
+                logger.accept("WARNING: GitHub API unavailable (" + e.getMessage()
+                        + "); using cached release metadata for " + cached.tag());
+                return cached;
+            }
+            throw new IOException("Cannot resolve python-build-standalone release: "
+                    + e.getMessage() + ". Set GITHUB_TOKEN to raise the GitHub API rate limit, or seed "
+                    + cacheFile, e);
+        }
+    }
+
+    private static ReleaseMetadata fetchLatestRelease(Consumer<String> logger) throws IOException {
         URI apiUri = URI.create(RELEASES_URL + "/latest");
         HttpURLConnection conn = createGitHubConnection(apiUri);
 
@@ -133,46 +158,164 @@ public final class PythonDownloader {
             String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             Map<?, ?> release = parseJson(json);
             Object tagName = release.get("tag_name");
-            if (tagName != null) {
-                logger.accept("Latest release tag: " + tagName);
-                return tagName.toString();
+            if (tagName == null) {
+                throw new IOException("Cannot find tag_name in release JSON");
             }
-            throw new IOException("Cannot find tag_name in release JSON");
-        }
-    }
 
-    private static String findMatchingAsset(String releaseTag, String pythonVersion,
-                                            String targetTriple, Consumer<String> logger) throws IOException {
-        URI apiUri = URI.create(RELEASES_URL + "/tags/" + releaseTag);
-        HttpURLConnection conn = createGitHubConnection(apiUri);
-
-        int status = conn.getResponseCode();
-        if (status != 200) {
-            throw new IOException("GitHub API returned HTTP " + status
-                    + " for releases/tags/" + releaseTag);
-        }
-
-        try (InputStream is = conn.getInputStream()) {
-            String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            Map<?, ?> release = parseJson(json);
-            Object assets = release.get("assets");
-            if (assets instanceof List) {
-                for (Object asset : (List<?>) assets) {
+            List<String> assets = new ArrayList<>();
+            Object assetsObj = release.get("assets");
+            if (assetsObj instanceof List) {
+                for (Object asset : (List<?>) assetsObj) {
                     if (asset instanceof Map) {
-                        Map<?, ?> assetMap = (Map<?, ?>) asset;
-                        String name = assetMap.get("name").toString();
-                        if (name.startsWith("cpython-" + pythonVersion + ".")
-                                && name.contains(targetTriple)
-                                && name.endsWith("-install_only.tar.gz")) {
-                            logger.accept("Found matching asset: " + name);
-                            return name;
+                        Object name = ((Map<?, ?>) asset).get("name");
+                        if (name != null) {
+                            assets.add(name.toString());
                         }
                     }
                 }
             }
+            if (assets.isEmpty()) {
+                throw new IOException("No assets listed for release " + tagName);
+            }
+
+            logger.accept("Latest release tag: " + tagName);
+            return new ReleaseMetadata(tagName.toString(), List.copyOf(assets));
+        }
+    }
+
+    static String findMatchingAsset(List<String> assets, String pythonVersion,
+                                    String targetTriple) throws IOException {
+        for (String name : assets) {
+            if (name.startsWith("cpython-" + pythonVersion + ".")
+                    && name.contains(targetTriple)
+                    && name.endsWith("-install_only.tar.gz")) {
+                return name;
+            }
         }
         throw new IOException("No matching python-build-standalone asset found for "
                 + "Python " + pythonVersion + " on " + targetTriple);
+    }
+
+    /**
+     * Verifies an archive against the release's {@code SHA256SUMS}.
+     *
+     * <p>python-build-standalone stopped publishing per-asset {@code .sha256} files at
+     * the 2024-03 release; since 2024-10 a single {@code SHA256SUMS} asset carries
+     * every digest.
+     *
+     * <p>A freshly downloaded archive is never used unverified. A cached archive is
+     * verified when the checksum list is reachable, and skipped with a warning only
+     * when it is not, so offline builds keep working.
+     */
+    private static void verifyArchive(Path archive, String assetName, String releaseTag,
+                                      Path cacheDir, boolean freshlyDownloaded,
+                                      Consumer<String> logger) throws IOException {
+        Path sumsFile = cacheDir.resolve(SHA256SUMS_FILE + "-" + releaseTag);
+        if (!Files.exists(sumsFile)) {
+            String sumsUrl = DOWNLOAD_BASE + releaseTag + "/" + SHA256SUMS_FILE;
+            try {
+                logger.accept("Downloading checksums: " + sumsUrl);
+                downloadFile(sumsUrl, sumsFile, logger);
+            } catch (IOException e) {
+                Files.deleteIfExists(sumsFile);
+                if (freshlyDownloaded) {
+                    Files.deleteIfExists(archive);
+                    throw new IOException("Cannot verify freshly downloaded archive: "
+                            + "SHA256SUMS unavailable for " + releaseTag, e);
+                }
+                logger.accept("WARNING: SHA256SUMS unavailable and archive is cached; "
+                        + "skipping verification");
+                return;
+            }
+        }
+
+        String expectedHash = parseSha256Sums(Files.readString(sumsFile), assetName);
+        if (expectedHash == null) {
+            if (freshlyDownloaded) {
+                Files.deleteIfExists(archive);
+                throw new IOException("No checksum entry for " + assetName
+                        + " in SHA256SUMS of " + releaseTag);
+            }
+            logger.accept("WARNING: no checksum entry for " + assetName
+                    + "; skipping verification of cached archive");
+            return;
+        }
+
+        String actualHash = computeFileSha256(archive);
+        if (!expectedHash.equalsIgnoreCase(actualHash)) {
+            Files.deleteIfExists(archive);
+            Files.deleteIfExists(sumsFile);
+            throw new IOException("SHA256 mismatch for " + assetName
+                    + ": expected " + expectedHash + ", got " + actualHash);
+        }
+        logger.accept("SHA256 checksum verified: " + actualHash);
+    }
+
+    /**
+     * Finds the checksum for {@code assetName} in a {@code SHA256SUMS} file.
+     * Each line is {@code <hex>  <name>}, optionally {@code <hex> *<name>}.
+     *
+     * @return the lowercase hex digest, or {@code null} when the asset is absent
+     */
+    static String parseSha256Sums(String content, String assetName) {
+        for (String line : content.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String[] parts = trimmed.split("\\s+", 2);
+            if (parts.length < 2) {
+                continue;
+            }
+            String name = parts[1].trim();
+            if (name.startsWith("*")) {
+                name = name.substring(1);
+            }
+            if (name.equals(assetName)) {
+                return parts[0].toLowerCase();
+            }
+        }
+        return null;
+    }
+
+    static void writeReleaseMetadataCache(Path cacheFile, ReleaseMetadata metadata) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("tag=").append(metadata.tag()).append('\n');
+        for (String asset : metadata.assets()) {
+            sb.append("asset=").append(asset).append('\n');
+        }
+        Path tmp = cacheFile.resolveSibling(cacheFile.getFileName() + ".tmp");
+        Files.writeString(tmp, sb.toString(), StandardCharsets.UTF_8);
+        Files.move(tmp, cacheFile, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    static ReleaseMetadata readReleaseMetadataCache(Path cacheFile) {
+        if (!Files.exists(cacheFile)) {
+            return null;
+        }
+        try {
+            String tag = null;
+            List<String> assets = new ArrayList<>();
+            for (String line : Files.readAllLines(cacheFile, StandardCharsets.UTF_8)) {
+                if (line.startsWith("tag=")) {
+                    tag = line.substring("tag=".length()).trim();
+                } else if (line.startsWith("asset=")) {
+                    assets.add(line.substring("asset=".length()));
+                }
+            }
+            if (tag == null || tag.isEmpty() || assets.isEmpty()) {
+                return null;
+            }
+            return new ReleaseMetadata(tag, List.copyOf(assets));
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * A resolved python-build-standalone release tag and the names of its assets.
+     */
+    record ReleaseMetadata(String tag, List<String> assets) {
     }
 
     private static void downloadFile(String url, Path target, Consumer<String> logger) throws IOException {
