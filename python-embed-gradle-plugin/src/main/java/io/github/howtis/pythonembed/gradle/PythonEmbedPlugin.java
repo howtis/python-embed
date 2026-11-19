@@ -6,7 +6,10 @@ import org.gradle.api.Project;
 import org.gradle.api.file.Directory;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.provider.Property;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.language.jvm.tasks.ProcessResources;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskAction;
@@ -18,6 +21,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -55,6 +59,7 @@ public class PythonEmbedPlugin implements Plugin<Project> {
         // Register extension
         PythonEmbedExtension extension = project.getExtensions()
                 .create(EXTENSION_NAME, PythonEmbedExtension.class);
+        extension.getEmbedVenv().convention(true);
 
         // Determine venv output directory
         DirectoryProperty venvOutputDir = extension.getVenvOutputDir();
@@ -84,6 +89,7 @@ public class PythonEmbedPlugin implements Plugin<Project> {
                     ? venvOutputDir
                     : project.getLayout().getBuildDirectory().dir("python-venv"));
             task.getOutputDir().set(generatedResourcesDir);
+            task.getEmbedVenv().set(extension.getEmbedVenv());
             task.dependsOn(venvTask);
         });
 
@@ -97,7 +103,7 @@ public class PythonEmbedPlugin implements Plugin<Project> {
             main.getResources().srcDir(generatedResourcesDir);
 
             // Add build/python-venv as a resource directory only if embedded
-            // (i.e., venv is under the build directory)
+            // (i.e., venv is under the build directory) and embedding is enabled.
             Directory actualVenvDir = venvOutputDir.isPresent()
                     ? venvOutputDir.get()
                     : defaultVenvDir;
@@ -107,7 +113,15 @@ public class PythonEmbedPlugin implements Plugin<Project> {
             boolean embedded = venvPath.startsWith(buildPath);
 
             if (embedded) {
-                main.getResources().srcDir(actualVenvDir);
+                // Resolve the embedding flag lazily: the extension block in the
+                // consumer's build script runs after this configuration.
+                Provider<Boolean> embedVenv = extension.getEmbedVenv();
+                project.getTasks().named(main.getProcessResourcesTaskName(), ProcessResources.class)
+                        .configure(task -> task.from(
+                                project.provider(() -> embedVenv.getOrElse(true)
+                                        ? List.of(actualVenvDir)
+                                        : List.of()),
+                                copy -> copy.into("python-venv")));
             }
 
             // processResources depends on both createVenv and props generation
@@ -134,6 +148,14 @@ public class PythonEmbedPlugin implements Plugin<Project> {
         public abstract DirectoryProperty getVenvDir();
 
         /**
+         * Whether the venv is copied into the JAR as a classpath resource.
+         *
+         * @return whether the venv is embedded
+         */
+        @org.gradle.api.tasks.Input
+        public abstract Property<Boolean> getEmbedVenv();
+
+        /**
          * Output directory for the properties file (under resources).
          *
          * @return output directory for the properties file
@@ -147,7 +169,8 @@ public class PythonEmbedPlugin implements Plugin<Project> {
             Path venvPath = getVenvDir().get().getAsFile().toPath().toAbsolutePath();
             Path buildDirPath = getProject().getLayout().getBuildDirectory().get()
                     .getAsFile().toPath().toAbsolutePath();
-            boolean embedded = venvPath.startsWith(buildDirPath);
+            boolean embedded = getEmbedVenv().getOrElse(true)
+                    && venvPath.startsWith(buildDirPath);
 
             Properties props = new Properties();
             props.setProperty(PROPS_KEY_VENV_PATH, venvPath.toString());

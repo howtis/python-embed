@@ -1,6 +1,13 @@
 # Changelog
 
-## [1.0.3] - 2026-06-26
+## [1.0.3] - 2026-11-20
+
+### Added
+- `embedVenv` property (default `true`) to opt out of embedding the venv in the JAR
+
+### Fixed
+- An embedded venv is now copied under the `python-venv/` prefix. It used to be added as a resource source directory, which scattered `bin/`, `lib/` and `pyvenv.cfg` at the JAR root, where the runtime could not find them.
+- `embedVenv` is resolved after the build script runs, so `pythonEmbed { embedVenv = false }` takes effect.
 
 ### Changed
 - Extracted shared build logic into `python-embed-build-common` (VenvManager, PythonDownloader, FingerprintManager, etc.)

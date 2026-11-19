@@ -142,4 +142,49 @@ class PythonResolverTest {
         assertNotNull(triple);
         assertTrue(triple.matches(".+-.+-.+"));
     }
+
+    // ---------------------------------------------------------------- version pinning
+
+    @Test
+    void satisfiesVersion_acceptsPatchWithinRequestedMinor() {
+        assertTrue(PythonResolver.satisfiesVersion("3.12.16", "3.12"));
+    }
+
+    @Test
+    void satisfiesVersion_rejectsOtherMinor() {
+        assertFalse(PythonResolver.satisfiesVersion("3.14.4", "3.12"));
+    }
+
+    @Test
+    void satisfiesVersion_rejectsNearMissMinor() {
+        // "3.1.5" must not look like a match for "3.12" just by prefix text.
+        assertFalse(PythonResolver.satisfiesVersion("3.1.5", "3.12"));
+    }
+
+    @Test
+    void satisfiesVersion_acceptsMajorOnlyRequest() {
+        assertTrue(PythonResolver.satisfiesVersion("3.14.4", "3"));
+    }
+
+    @Test
+    void satisfiesVersion_exactMatch() {
+        assertTrue(PythonResolver.satisfiesVersion("3.12.16", "3.12.16"));
+    }
+
+    @Test
+    void satisfiesVersion_rejectsHigherPatchWhenPatchRequested() {
+        assertFalse(PythonResolver.satisfiesVersion("3.12.17", "3.12.16"));
+    }
+
+    @Test
+    void satisfiesVersion_nullOrEmptyInputsAreRejected() {
+        assertFalse(PythonResolver.satisfiesVersion(null, "3.12"));
+        assertFalse(PythonResolver.satisfiesVersion("3.12.16", null));
+        assertFalse(PythonResolver.satisfiesVersion("3.12.16", ""));
+    }
+
+    @Test
+    void queryVersion_missingExecutable_returnsNull() {
+        assertNull(PythonResolver.queryVersion("definitely-not-a-python-binary-12345"));
+    }
 }

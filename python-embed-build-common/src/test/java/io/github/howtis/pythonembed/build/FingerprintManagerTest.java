@@ -109,6 +109,30 @@ class FingerprintManagerTest {
     }
 
     @Test
+    void read_fingerprintWithoutFormat_returnsNull(@TempDir Path venvDir) throws IOException {
+        String content = """
+                python.source=system
+                python.version=3.12
+                packages.hash=abc123
+                """;
+        Files.writeString(venvDir.resolve("python-embed.fingerprint"), content);
+        // Written before python.version meant the version actually in use; untrustworthy.
+        assertNull(FingerprintManager.read(venvDir));
+    }
+
+    @Test
+    void read_unknownFormat_returnsNull(@TempDir Path venvDir) throws IOException {
+        String content = """
+                fingerprint.format=1
+                python.source=system
+                python.version=3.12
+                packages.hash=abc123
+                """;
+        Files.writeString(venvDir.resolve("python-embed.fingerprint"), content);
+        assertNull(FingerprintManager.read(venvDir));
+    }
+
+    @Test
     void write_read_roundtrip_bundled(@TempDir Path venvDir) {
         FingerprintManager.write(venvDir, "bundled", "3.11", "def456");
         FingerprintManager.Fingerprint fp = FingerprintManager.read(venvDir);

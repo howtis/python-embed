@@ -1,6 +1,7 @@
 package io.github.howtis.pythonembed.build;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -35,6 +36,55 @@ public final class PythonResolver {
             }
         }
         return null;
+    }
+
+    /**
+     * Reports the version of a Python executable as {@code major.minor.patch}.
+     *
+     * @param command a command name such as {@code python3}, or a path to an executable
+     * @return the version, or {@code null} when the interpreter cannot be queried
+     */
+    public static String queryVersion(String command) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command, "-c",
+                    "import sys; print('%d.%d.%d' % sys.version_info[:3])");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            int exitCode = p.waitFor();
+            if (exitCode == 0 && !output.isEmpty()) {
+                return output;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /**
+     * Reports the version of a Python executable.
+     *
+     * @param executable path to a Python executable
+     * @return the version, or {@code null} when the interpreter cannot be queried
+     */
+    public static String queryVersion(Path executable) {
+        return queryVersion(executable.toString());
+    }
+
+    /**
+     * Tests whether an interpreter version satisfies a requested version.
+     *
+     * <p>The request is a prefix: {@code 3.12} accepts {@code 3.12.16} but not
+     * {@code 3.13.0}, and {@code 3} accepts any {@code 3.x.y}.
+     *
+     * @param actualVersion version reported by an interpreter, e.g. {@code 3.12.16}
+     * @param requestedVersion configured version, e.g. {@code 3.12}
+     * @return true when the actual version satisfies the request
+     */
+    public static boolean satisfiesVersion(String actualVersion, String requestedVersion) {
+        if (actualVersion == null || requestedVersion == null || requestedVersion.isEmpty()) {
+            return false;
+        }
+        return actualVersion.equals(requestedVersion) || actualVersion.startsWith(requestedVersion + ".");
     }
 
     /**

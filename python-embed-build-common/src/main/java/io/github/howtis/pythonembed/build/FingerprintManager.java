@@ -21,6 +21,17 @@ public final class FingerprintManager {
     static final String KEY_PYTHON_SOURCE = "python.source";
     static final String KEY_PYTHON_VERSION = "python.version";
     static final String KEY_PACKAGES_HASH = "packages.hash";
+    static final String KEY_FORMAT = "fingerprint.format";
+
+    /**
+     * Fingerprint layout version.
+     *
+     * <p>Bumped to 2 when {@code python.version} changed meaning from the requested
+     * version to the version the venv actually runs. A fingerprint written under the
+     * old meaning records a number that cannot be trusted, so it is discarded rather
+     * than compared.
+     */
+    static final String FORMAT = "2";
 
     private FingerprintManager() {
     }
@@ -78,10 +89,12 @@ public final class FingerprintManager {
         } catch (IOException e) {
             return null;
         }
+        String format = props.getProperty(KEY_FORMAT);
         String pythonSource = props.getProperty(KEY_PYTHON_SOURCE);
         String pythonVersion = props.getProperty(KEY_PYTHON_VERSION);
         String packageHash = props.getProperty(KEY_PACKAGES_HASH);
-        if (pythonSource == null || pythonVersion == null || packageHash == null) {
+        if (!FORMAT.equals(format) || pythonSource == null
+                || pythonVersion == null || packageHash == null) {
             return null;
         }
         return new Fingerprint(pythonSource, pythonVersion, packageHash);
@@ -99,6 +112,7 @@ public final class FingerprintManager {
     public static void write(Path venvDir, String pythonSource, String pythonVersion,
                              String packageHash) {
         Properties props = new Properties();
+        props.setProperty(KEY_FORMAT, FORMAT);
         props.setProperty(KEY_PYTHON_SOURCE, pythonSource);
         props.setProperty(KEY_PYTHON_VERSION, pythonVersion);
         props.setProperty(KEY_PACKAGES_HASH, packageHash);

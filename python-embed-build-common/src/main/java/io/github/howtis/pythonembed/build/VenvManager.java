@@ -65,17 +65,20 @@ public final class VenvManager {
             }
         }
 
-        String pythonVersion = config.pythonVersion();
+        String requestedVersion = config.pythonVersion();
         log.accept("Output directory: " + venvDir);
 
         // Compute fingerprint
         String currentPackageHash = FingerprintManager.computePackageHash(
                 packages, config.pipIndexUrl(), config.pipExtraArgs(), pyprojectPath);
 
-        // Check stored fingerprint
+        // Check stored fingerprint. The stored version is the version the venv
+        // actually runs, so comparing it against the request is what keeps a
+        // `pythonVersion` change from being ignored.
         FingerprintManager.Fingerprint stored = FingerprintManager.read(venvDir);
         boolean pythonPresent = PythonResolver.findPythonInDir(venvDir, resolvedTargetOs) != null;
-        boolean pythonVersionMatch = stored != null && pythonVersion.equals(stored.pythonVersion);
+        boolean pythonVersionMatch = stored != null
+                && PythonResolver.satisfiesVersion(stored.pythonVersion, requestedVersion);
         boolean packagesMatch = stored != null && currentPackageHash.equals(stored.packageHash);
         boolean sourceKnown = stored != null && stored.pythonSource != null;
 
@@ -97,8 +100,19 @@ public final class VenvManager {
             Files.createDirectories(venvDir);
 
             String systemPython = PythonResolver.findSystemPython(log);
-            if (systemPython != null && !systemPython.contains(java.io.File.separator)) {
-                // System Python found
+            String systemVersion = systemPython == null
+                    ? null
+                    : PythonResolver.queryVersion(systemPython);
+            boolean systemMatches = PythonResolver.satisfiesVersion(systemVersion, requestedVersion);
+
+            if (systemPython != null && !systemMatches) {
+                log.accept("System Python is " + systemVersion
+                        + ", which does not satisfy the requested " + requestedVersion
+                        + "; using python-build-standalone instead");
+            }
+
+            if (systemMatches) {
+                // System Python found and it satisfies the requested version
                 pythonSource = "system";
                 log.accept("Creating venv...");
                 runCommand(log, systemPython, "-m", "venv", venvDir.toString());
@@ -108,8 +122,8 @@ public final class VenvManager {
                 pythonSource = "bundled";
                 Path cacheDir = Path.of(System.getProperty("user.home"),
                         ".python-embed");
-                log.accept("System Python not found. Downloading python-build-standalone...");
-                pythonExe = PythonDownloader.download(pythonVersion, resolvedTargetOs, cacheDir, venvDir, log);
+                log.accept("Downloading python-build-standalone " + requestedVersion + "...");
+                pythonExe = PythonDownloader.download(requestedVersion, resolvedTargetOs, cacheDir, venvDir, log);
             }
         } else {
             pythonExe = PythonResolver.findPythonInDir(venvDir, resolvedTargetOs);
@@ -131,8 +145,18 @@ public final class VenvManager {
             }
         }
 
-        // Write fingerprint
-        FingerprintManager.write(venvDir, pythonSource, pythonVersion, currentPackageHash);
+        // Write fingerprint. Record the version the venv actually runs, not the
+        // requested one, so a mismatch can never hide behind an incremental skip.
+        String actualVersion = PythonResolver.queryVersion(pythonExe);
+        if (actualVersion == null) {
+            throw new IOException("Cannot determine the Python version of " + pythonExe);
+        }
+        if (!PythonResolver.satisfiesVersion(actualVersion, requestedVersion)) {
+            throw new IOException("Resolved Python " + actualVersion
+                    + " does not satisfy the requested " + requestedVersion);
+        }
+        log.accept("Python version: " + actualVersion);
+        FingerprintManager.write(venvDir, pythonSource, actualVersion, currentPackageHash);
 
         log.accept("Python environment ready at: " + venvDir);
         return new PythonEnvironment(pythonExe, venvDir, pythonSource);

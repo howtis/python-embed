@@ -60,6 +60,19 @@ public abstract class PythonEmbedExtension {
     public abstract DirectoryProperty getVenvOutputDir();
 
     /**
+     * Whether to embed the venv in the JAR as a classpath resource
+     * (default: {@code true}).
+     *
+     * <p>An embedded venv is specific to the platform it was built on, so a
+     * library artifact published for other platforms should turn this off.
+     * Applications, whose build platform matches their runtime platform, keep
+     * it on.
+     *
+     * @return whether to embed the venv
+     */
+    public abstract Property<Boolean> getEmbedVenv();
+
+    /**
      * Optional path to requirements.txt (relative to project root).
      *
      * @return optional path to requirements.txt
