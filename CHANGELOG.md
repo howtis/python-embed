@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- [python-embed-build-common](python-embed-build-common/CHANGELOG.md) — `PythonDownloader` verifies downloads against `SHA256SUMS` (the per-asset `.sha256` files it requested were removed upstream in 2024), caches release metadata so builds survive the anonymous GitHub API limit, and follows the repository move to `astral-sh/python-build-standalone`
+- [python-embed-runtime](python-embed-runtime/CHANGELOG.md) (1.0.3) — `@Deprecated(since=…)` on `proxy(int, Class)` now names the module version that introduced the deprecation instead of the umbrella version
+
 ## [1.0.5] - 2026-06-27
 
 - [python-embed-runtime](python-embed-runtime/CHANGELOG.md) (1.0.3) — Sticky Session for `ref()` handles: idle scale-down no longer invalidates active handles; `proxy(int refId, Class)` deprecated

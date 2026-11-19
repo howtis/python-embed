@@ -34,6 +34,8 @@ jobs:
 
       - name: Run tests
         run: ./gradlew test jacocoTestReport --refresh-dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -80,6 +82,8 @@ jobs:
 
       - name: Run all examples
         run: ./gradlew -p python-embed-examples runAllExamples
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload failure logs
         if: failure()

@@ -35,6 +35,8 @@ jobs:
 
       - name: Build
         run: ./gradlew :python-embed-runtime:build${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to Maven Central
         run: ./gradlew :python-embed-runtime:publishToMavenCentral --no-configuration-cache${{ steps.version.outputs.VERSION && format(' -PreleaseVersion={0}', steps.version.outputs.VERSION) || '' }}

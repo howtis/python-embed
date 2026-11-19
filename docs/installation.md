@@ -12,7 +12,7 @@ plugins {
 }
 
 dependencies {
-    implementation 'io.github.howtis:python-embed-runtime:1.0.2'
+    implementation 'io.github.howtis:python-embed-runtime:1.0.3'
 }
 ```
 

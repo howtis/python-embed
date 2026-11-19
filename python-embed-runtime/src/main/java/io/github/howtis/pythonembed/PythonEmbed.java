@@ -666,7 +666,7 @@ public class PythonEmbed implements AutoCloseable {
      * @return a dynamic proxy implementing the given interface
      * @throws IllegalArgumentException if {@code interfaceClass} is not an interface
      */
-    @Deprecated(since = "1.0.5", forRemoval = false)
+    @Deprecated(since = "1.0.3", forRemoval = false)
     @SuppressWarnings("unchecked")
     public <T> T proxy(int refId, Class<T> interfaceClass) {
         if (!interfaceClass.isInterface()) {

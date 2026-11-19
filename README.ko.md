@@ -30,7 +30,7 @@ PythonEmbed는 서브프로세스 + [MessagePack](https://msgpack.org/) 바이�
     }
 
     dependencies {
-        implementation 'io.github.howtis:python-embed-runtime:1.0.2'
+        implementation 'io.github.howtis:python-embed-runtime:1.0.3'
     }
     ```
 
